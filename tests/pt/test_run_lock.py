@@ -80,6 +80,8 @@ def test_simultaneous_fires_elect_exactly_one_paper(pt_home):
     script = ROOT / "pt-shared" / "scripts" / "run_lock.py"
     argv = [sys.executable, str(script), "acquire", "--name", "paper-workspace-2026-09-24",
             "--stale-minutes", "240"]
-    procs = [subprocess.Popen(argv, stdout=subprocess.PIPE, text=True) for _ in range(8)]
-    results = sorted(p.communicate()[0].strip() for p in procs)
-    assert results == ["acquired"] + ["held"] * 7
+    for round_ in range(10):
+        (pt_home / "run" / "paper-workspace-2026-09-24.lock").unlink(missing_ok=True)
+        procs = [subprocess.Popen(argv, stdout=subprocess.PIPE, text=True) for _ in range(8)]
+        results = sorted(p.communicate()[0].strip() for p in procs)
+        assert results == ["acquired"] + ["held"] * 7, f"round {round_}: {results}"

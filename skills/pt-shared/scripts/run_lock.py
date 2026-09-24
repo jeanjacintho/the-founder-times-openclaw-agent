@@ -30,10 +30,12 @@ without acquiring, or two releases raced). The lock directory is
 from __future__ import annotations
 
 import argparse
+import fcntl
 import os
 import pathlib
 import re
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from pt_paths import pt_home
@@ -65,39 +67,59 @@ def age_minutes(text):
     return (now() - stamp).total_seconds() / 60.0
 
 
+@contextmanager
+def guarded(directory):
+    """Serialize every check-and-take on this host.
+
+    O_EXCL alone left two windows, both measured with eight simultaneous
+    acquirers: a racer could read the lock between its creation and its
+    timestamp (empty, so "unparseable", so taken over), and two racers could
+    both decide the same stale lock was theirs. Under one flock the lock is
+    never seen half-written and only one process ever decides.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    with open(directory / ".run_lock.guard", "a") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(guard, fcntl.LOCK_UN)
+
+
 def acquire(name, stale_minutes):
     path = lock_path(name)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-    except FileExistsError:
+    with guarded(path.parent):
         try:
-            text = path.read_text()
-        except OSError:
-            text = ""
-        age = age_minutes(text)
-        if age is None or age > stale_minutes:
-            # A lock we cannot parse, or one older than the whole run budget,
-            # is a dead run's leftover -- taking it over beats blocking the
-            # paper forever. A parsed-and-fresh lock is a live owner: held.
-            path.write_text(now().isoformat(timespec="seconds") + "\n")
-            print("stale-takeover")
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            try:
+                text = path.read_text()
+            except OSError:
+                text = ""
+            age = age_minutes(text)
+            if age is None or age > stale_minutes:
+                # A lock we cannot parse, or one older than the whole run budget,
+                # is a dead run's leftover -- taking it over beats blocking the
+                # paper forever. A parsed-and-fresh lock is a live owner: held.
+                path.write_text(now().isoformat(timespec="seconds") + "\n")
+                print("stale-takeover")
+                return 0
+            print("held")
             return 0
-        print("held")
-        return 0
-    with os.fdopen(fd, "w") as handle:
-        handle.write(now().isoformat(timespec="seconds") + "\n")
+        with os.fdopen(fd, "w") as handle:
+            handle.write(now().isoformat(timespec="seconds") + "\n")
     print("acquired")
     return 0
 
 
 def release(name):
     path = lock_path(name)
-    try:
-        path.unlink()
-        print("released")
-    except FileNotFoundError:
-        print("nothing-to-release")
+    with guarded(path.parent):
+        try:
+            path.unlink()
+            print("released")
+        except FileNotFoundError:
+            print("nothing-to-release")
     return 0
 
 
