@@ -11,7 +11,7 @@ READY printed no LANG line, so the model followed the stored language.
 This script is the mechanical write. pt-intake names the language of
 THIS owner message (plain-English name) and runs:
 
-    record_owner_language.py /var/lib/hermes/pt/config.json English
+    record_owner_language.py /var/lib/plow/pt/config.json English
 
 Skip the call only when the message is a lone acknowledgement
 (yes / y / ok / sim / no / não) with no other words.
@@ -32,8 +32,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import setup_needed as _gate  # noqa: E402
+from pt_paths import config_file  # noqa: E402
 
-DEFAULT_CONFIG = "/var/lib/hermes/pt/config.json"
+DEFAULT_CONFIG = str(config_file())
 
 
 def _write_json(path, data):

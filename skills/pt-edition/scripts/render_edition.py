@@ -45,6 +45,7 @@ sys.path.insert(
     0, str(pathlib.Path(__file__).resolve().parents[2] / "pt-shared" / "scripts")
 )
 from owner_language import is_portuguese  # noqa: E402
+from pt_paths import config_file  # noqa: E402
 DEFAULT_MASTHEAD = "THE FOUNDER TIMES"
 KINDS = ("section", "assignment")
 # Standing newspaper desks. weather and calendar always run; mail only when
@@ -52,7 +53,7 @@ KINDS = ("section", "assignment")
 # and assignment -- same story shape, different page slot.
 DESKS = ("priority", "news", "weather", "calendar", "mail", "sports")
 DESK_ORDER = {"priority": -1, "weather": 0, "calendar": 1, "mail": 2, "sports": 3, "news": 4}
-CONFIG_DEFAULT = "/var/lib/hermes/pt/config.json"
+CONFIG_DEFAULT = str(config_file())
 # Controlled vocabulary for a sports desk game row -- what state the game
 # is in, drawn as a label/tag, never free text.
 GAME_STATUSES = ("scheduled", "live", "final")

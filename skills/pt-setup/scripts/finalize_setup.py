@@ -2,7 +2,7 @@
 """finalize_setup.py -- the ONLY way pt-setup writes pt/config.json.
 
 Measured live (2026-09-16): the close step said "**Write**
-/var/lib/hermes/pt/config.json from the draft plus those two fields" and
+/var/lib/plow/pt/config.json from the draft plus those two fields" and
 named no command, and nothing in the tree wrote that file. The run had
 everything it needed -- printer probed through the AppleScript fallback,
 timezone read from the browser, topics saved -- then ran pt_config_gate.py

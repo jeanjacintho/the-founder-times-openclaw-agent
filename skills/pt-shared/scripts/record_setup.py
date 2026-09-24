@@ -59,8 +59,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import setup_needed as _gate  # noqa: E402 -- sibling script; reuse draft_line
+from pt_paths import config_file  # noqa: E402
 
-DEFAULT_CONFIG = "/var/lib/hermes/pt/config.json"
+DEFAULT_CONFIG = str(config_file())
 # The order pt-setup/SKILL.md's questions are asked in, plus the close step.
 # next_question() returns the first of these whose draft field is missing.
 QUESTION_ORDER = ("hour", "printer", "priority", "mail", "news")

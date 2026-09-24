@@ -59,10 +59,11 @@ from zoneinfo import ZoneInfo
 from bearer_http import post_json, post_json_read, put_bytes, require
 from owner_language import is_portuguese
 from owner_time import owner_now
+from pt_paths import config_file, pt_home
 from setup_needed import owner_language
 
 
-CONFIG_DEFAULT = "/var/lib/hermes/pt/config.json"
+CONFIG_DEFAULT = str(config_file())
 PRINT_SCRIPT = (
     Path(__file__).resolve().parent.parent.parent
     / "pt-print"
@@ -386,7 +387,7 @@ def main():
     # recovery instruction could run, so a bad timezone caught only there
     # would report a generic failure with no "do not repost" and risk a
     # duplicate send on retry.
-    lock_path = Path(os.environ.get("PT_HOME", "/var/lib/hermes/pt")) / "run" / "delivery-order.lock"
+    lock_path = pt_home() / "run" / "delivery-order.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "a") as lock_file:
         fcntl.flock(lock_file, fcntl.LOCK_EX)

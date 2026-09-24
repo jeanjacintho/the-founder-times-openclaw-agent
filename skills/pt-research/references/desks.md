@@ -5,7 +5,7 @@ file's order. The daily run always fills weather and calendar. Priority
 runs only when `pt/config.json` has `"priority": { "configured": true }`.
 Mail joins only when it has `"mail": { "configured": true }`; sports
 joins only when it has `"sports": { "configured": true }`. Ordinary desk notes go under
-`/var/lib/hermes/pt/run/desk-<name>/notes.json` (same shape as a topic
+`/var/lib/plow/pt/run/desk-<name>/notes.json` (same shape as a topic
 notes file, `topic_id` omitted; every desk file also carries a top-level
 `"date": "<today>"`, and `render_edition.py` refuses one with none or another
 day's when the edition carries a standing desk, so a failed gather cannot
@@ -25,7 +25,7 @@ accepted checkpoint (dated today, at its completed third-generation gate — wha
 copy never waits on a tournament: it reuses that checkpoint whatever its date, and pt-edition
 prints an older one with its `as_of` date. With none to reuse (none today for a scheduled
 paper; none ever accepted for the on-demand copy), run
-`/var/lib/hermes/skills/pt-shared/scripts/wiki_setup.py --desk`,
+`/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk`,
 then load `pt-priority` and follow it. `pt-priority` alone writes the atomic
 `run/desk-priority/tournament.json` checkpoint. It reads the owner's sources itself and spends no
 web budget. The morning run has no checkpoint for today yet; a later paper the same day reuses it.

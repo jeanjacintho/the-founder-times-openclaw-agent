@@ -5,7 +5,7 @@ description: The Founder Times' cron spec — one nightly job per active subscri
 
 # The Founder Times — the cron spec
 
-Two shapes plus the paper, all derived from `/var/lib/hermes/pt/topics.json`
+Two shapes plus the paper, all derived from `/var/lib/plow/pt/topics.json`
 at run time — unlike `ld-dashboard`'s fixed seven rows, this spec is the
 topic list:
 
@@ -49,7 +49,7 @@ after any rebuild of the home, at the close of `pt-setup` (so the first
 paper's job exists as soon as setup ends), and after pt-intake adds or
 cancels a subscription, section or assignment.
 
-    /var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py
+    /opt/plow/skills/pt-dashboard/scripts/register_crons.py
 
 **Then paste its output verbatim and report its exit status. The run is not
 done until you have.** The script signals every refusal it has — a missing

@@ -19,8 +19,10 @@ import re
 import sys
 from pathlib import Path
 
+from pt_paths import config_file
+
 _DELIVERY_HOUR_RE = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
-CONFIG_FILE = "/var/lib/hermes/pt/config.json"
+CONFIG_FILE = str(config_file())
 
 
 def setup_needed(path):

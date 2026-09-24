@@ -84,12 +84,13 @@ from zoneinfo import ZoneInfo
 _SKILLS = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..")
 sys.path[:0] = [os.path.join(_SKILLS, "pt-intake", "scripts"), os.path.join(_SKILLS, "pt-shared", "scripts")]
 from record_owner_language import _write_json  # noqa: E402 -- the config's atomic writer
+from pt_paths import config_file, script  # noqa: E402
 
 HERMES = "/opt/hermes/bin/hermes"
 # Where `hermes cron` persists its jobs -- nothing replays it on a rebuild,
 # which is the reason this script exists.
 JOBS_FILE = "/var/lib/hermes/cron/jobs.json"
-CONFIG_FILE = "/var/lib/hermes/pt/config.json"
+CONFIG_FILE = str(config_file())
 # The only job names this spec owns. Pinned as a fullmatch so a name that
 # does not parse is never interpreted, and a half-matching id never removes
 # a job (see stale_names).
@@ -165,7 +166,7 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
         f"(if that hour has already passed, post immediately; never wait until tomorrow)"
         if hold_until else ""
     )
-    lock = "/var/lib/hermes/skills/pt-shared/scripts/run_lock.py"
+    lock = script("pt-shared", "run_lock.py")
     advice = (
         "reuse today's accepted checkpoint in run/desk-priority/tournament.json when "
         "there is one, else run the tournament"
@@ -179,11 +180,11 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
         f"--name {WORKSPACE_LOCK}-<today's date in the owner's "
         f"zone> --stale-minutes {STALE_RUN_MINUTES + lead_minutes}; if its output is 'held', "
         f"another paper owns the workspace -- say NO_REPLY and stop. Then "
-        f"/var/lib/hermes/skills/pt-shared/scripts/prepare_daily_run.py --preserve-priority "
+        f"/opt/plow/skills/pt-shared/scripts/prepare_daily_run.py --preserve-priority "
         f"(it archives prior scratch after the lock; do not inspect or reuse old run files). Then "
-        f"/var/lib/hermes/skills/pt-intake/scripts/topics.py reopen-sections "
+        f"/opt/plow/skills/pt-intake/scripts/topics.py reopen-sections "
         f"(delivered sections are yesterday's paper, not a skip). Run "
-        f"/var/lib/hermes/skills/pt-intake/scripts/topics.py check-paper {check}. "
+        f"/opt/plow/skills/pt-intake/scripts/topics.py check-paper {check}. "
         f"If it refuses, repeat its named roster, run {lock} "
         f"release --name the same {WORKSPACE_LOCK}-<date>, and stop before research. "
         f"Then run pt-research: first the priority desk exactly as "

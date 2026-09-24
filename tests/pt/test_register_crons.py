@@ -808,13 +808,13 @@ def test_recipe_names_run_lock_as_a_bare_absolute_path():
     # invocation, then wrapping a shell.
     printed = crons.paper_prompt()
     assert (
-        "/var/lib/hermes/skills/pt-shared/scripts/run_lock.py acquire"
+        "/opt/plow/skills/pt-shared/scripts/run_lock.py acquire"
     ) in printed
     assert (
-        "/var/lib/hermes/skills/pt-shared/scripts/run_lock.py release"
+        "/opt/plow/skills/pt-shared/scripts/run_lock.py release"
     ) in printed
     assert (
-        "/var/lib/hermes/skills/pt-shared/scripts/prepare_daily_run.py"
+        "/opt/plow/skills/pt-shared/scripts/prepare_daily_run.py"
     ) in printed
     assert "python3" not in printed
 

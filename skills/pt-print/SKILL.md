@@ -15,7 +15,7 @@ costs the page.
 the run's `edition.pdf` — after the text fallback too, where a missing PDF
 is a reported miss; a second invocation would double-print. The one command it runs:
 
-    /var/lib/hermes/skills/pt-print/scripts/print_edition.py /var/lib/hermes/pt/run/<id>/edition.pdf /var/lib/hermes/pt/config.json
+    /opt/plow/skills/pt-print/scripts/print_edition.py /var/lib/plow/pt/run/<id>/edition.pdf /var/lib/plow/pt/config.json
 
 It reads `pt/config.json` itself: unless `printer.configured` is exactly
 `true` it prints `skipped: printer.configured is not true` and exits 0, and

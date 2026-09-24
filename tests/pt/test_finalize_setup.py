@@ -1,7 +1,7 @@
 """finalize_setup.py — the only way pt-setup writes pt/config.json.
 
 Measured live (2026-09-16): the close step said "**Write**
-/var/lib/hermes/pt/config.json from the draft" and named no command, and no
+/var/lib/plow/pt/config.json from the draft" and named no command, and no
 script in the tree wrote that file. The run had every field it needed —
 printer probed, timezone read, topics saved — ran the gate against a file
 nobody had created, got "not valid JSON" (the gate collapses OSError into

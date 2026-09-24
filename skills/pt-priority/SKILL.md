@@ -5,7 +5,7 @@ description: The advisor desk evolves three researched recommendations through i
 
 # pt-priority: an overnight tournament for the advice that matters most
 
-A paper run with no accepted checkpoint for today is the only writer. It owns `/var/lib/hermes/pt/advisor.md`,
+A paper run with no accepted checkpoint for today is the only writer. It owns `/var/lib/plow/pt/advisor.md`,
 `run/desk-priority/tournament.json`, and these Mac wiki pages:
 
 - `~/Plow/wiki/projects/theplowtimes/qa.md`: ranked `## Open` and `## Answered` entries,
@@ -44,18 +44,18 @@ The next daily run, not live intake, re-ranks Q&A by how much an answer changes 
   “the founder” appears only when discussing the advisor's general framework, never as a label
   for the reader.
 - Discover advisors by reading every `*.md` except `README.md` under
-  `/var/lib/hermes/skills/pt-setup/assets/advisors/`. Treat each by the `advisor` name in its
+  `/opt/plow/skills/pt-setup/assets/advisors/`. Treat each by the `advisor` name in its
   front matter. Application logic has no advisor- or industry-specific case.
 
 ## Orient
 
 Read all named advisor files, `qa.md`, `resources.md`, goals, today's desk evidence, and
-`pt/advisor.md`. Read `owner.language` from `/var/lib/hermes/pt/config.json` and keep its literal
+`pt/advisor.md`. Read `owner.language` from `/var/lib/plow/pt/config.json` and keep its literal
 value in the root context: every later stage is told to write in it, and nothing else in this skill
 says where it lives. An install that has no `owner.language` at all is `pt-edition/SKILL.md`'s case
 and keeps its answer -- the language the sourced notes read most naturally in, never a hardcoded
 default -- so the two desks of one paper cannot disagree.
-Run `/var/lib/hermes/skills/pt-priority/scripts/history.py recent` once and keep
+Run `/opt/plow/skills/pt-priority/scripts/history.py recent` once and keep
 its compact JSON in the root context; do not reopen or dump the edition archive. The newest
 delivered recommendations are generation zero. With no history, seed candidates from the named
 advisors' “Questions that change the advice.” Preserve the last fully criticized champion set as
@@ -64,7 +64,7 @@ A delivered edition dated today is still generation zero on a replay, never proo
 tournament ran in the current cron session.
 
 Load this skill once during Orient. Preserve any canonical
-`/var/lib/hermes/pt/run/desk-priority/tournament.json` checkpoint. Name the run from its
+`/var/lib/plow/pt/run/desk-priority/tournament.json` checkpoint. Name the run from its
 actual Orient invocation time as `YYYY-MM-DDTHHMM` and create
 `projects/theplowtimes/runs/<run-datetime>/state.md`. Copy the required OKF front matter shape from
 `qa.md`, with a run-specific title and description. The page is private research state, never printed.
@@ -247,14 +247,14 @@ the quote. The card is:
 ```
 
 When the desk cannot publish (Orient blocked, no checkpoint when time runs out), it writes
-`/var/lib/hermes/pt/run/desk-priority/notes.json` as
+`/var/lib/plow/pt/run/desk-priority/notes.json` as
 `{"date":"<edition date>","could_not_source":["<what failed and why>"]}`; the edition prints
 that reason as the unavailable card.
 
 Write the complete candidate checkpoint to
-`/var/lib/hermes/pt/run/desk-priority/tournament.candidate.json` and copy its
+`/var/lib/plow/pt/run/desk-priority/tournament.candidate.json` and copy its
 `priority` object into the priority section of
-`/var/lib/hermes/pt/run/desk-priority/card-edition.candidate.json`. The latter is a complete edition JSON document,
+`/var/lib/plow/pt/run/desk-priority/card-edition.candidate.json`. The latter is a complete edition JSON document,
 including `date`, `location`, and a `sections` list containing the priority section; it is not a
 standalone card fragment. The tournament checkpoint also carries that same edition `date` at its
 top level. Run the normal renderer gate
@@ -263,7 +263,7 @@ the checkpoint `stage` is exactly
 `generation_<n>_complete_gate_passed_checkpoint_written`, with `<n>` equal to `generation`.
 
 ```sh
-/var/lib/hermes/skills/pt-edition/scripts/render_edition.py /var/lib/hermes/pt/run/desk-priority/card-edition.candidate.json --tournament /var/lib/hermes/pt/run/desk-priority/tournament.candidate.json --chat /var/lib/hermes/pt/run/desk-priority/card-check.txt
+/opt/plow/skills/pt-edition/scripts/render_edition.py /var/lib/plow/pt/run/desk-priority/card-edition.candidate.json --tournament /var/lib/plow/pt/run/desk-priority/tournament.candidate.json --chat /var/lib/plow/pt/run/desk-priority/card-check.txt
 ```
 
 Only after that exits zero, atomically move `tournament.candidate.json` over

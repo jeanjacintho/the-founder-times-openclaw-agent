@@ -5,7 +5,7 @@ Latch probes and Mac file writes leave the chat silent, so the owner thinks
 it froze; typed mid-turn text is dropped on plow_chat. This POSTs through
 the same Plow Chat path as post_to_chat.py:
 
-    /var/lib/hermes/skills/pt-shared/scripts/chat_status.py --busy
+    /opt/plow/skills/pt-shared/scripts/chat_status.py --busy
 
 The first call posts a hang-on; later calls in the same wave no-op until
 BUSY_REPEAT_SECONDS, then post "still on it" once. Cron never calls it.
@@ -24,11 +24,12 @@ import post_to_chat  # noqa: E402
 from owner_language import is_portuguese  # noqa: E402
 import setup_needed as _gate  # noqa: E402
 from bearer_http import post_json  # noqa: E402
+from pt_paths import config_file, pt_home  # noqa: E402
 
 BUSY_REPEAT_SECONDS = 20
 BUSY_NEW_WAVE_SECONDS = 90
-BUSY_STAMP_DEFAULT = "/var/lib/hermes/pt/run/setup-busy.json"
-CONFIG_DEFAULT = "/var/lib/hermes/pt/config.json"
+BUSY_STAMP_DEFAULT = str(pt_home() / "run" / "setup-busy.json")
+CONFIG_DEFAULT = str(config_file())
 
 BUSY = {
     "pt": "⏳ Um instante — tô nessa.",

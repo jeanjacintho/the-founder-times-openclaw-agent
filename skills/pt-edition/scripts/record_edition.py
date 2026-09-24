@@ -46,6 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "pt-shared" / "scri
 from bearer_http import require
 from latch_mcp import LatchError
 from owner_time import owner_now
+from pt_paths import pt_home
 from wiki import EDITIONS, PAPER_LINK, connect, join_page, split_page
 from wiki_setup import ensure
 
@@ -150,7 +151,7 @@ def record(wiki, edition_json, chat, now):
     # Two papers (the daily job and a focused pt-paper-HHMM, say) hold
     # different run locks and can land here at the same moment; this file
     # lock serializes the day page's read-append-write between them.
-    lock_path = Path(os.environ.get("PT_HOME", "/var/lib/hermes/pt")) / "record-edition.lock"
+    lock_path = pt_home() / "record-edition.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "a") as lock_file:
         fcntl.flock(lock_file, fcntl.LOCK_EX)

@@ -5,8 +5,8 @@ description: First-run interview over chat — settle the morning delivery hour,
 
 # pt-setup — the first conversation
 
-This is a conversation, not a form. `/var/lib/hermes/pt/config.json` and
-`/var/lib/hermes/pt/.setup-draft.json` are the **only** record of how far
+This is a conversation, not a form. `/var/lib/plow/pt/config.json` and
+`/var/lib/plow/pt/.setup-draft.json` are the **only** record of how far
 it got — not the Plow Chat thread. Older messages about a printer or
 letters after a wiped session are leftover; if the draft is missing,
 start at the delivery hour. Do **not** ask their timezone — Latch location
@@ -19,7 +19,7 @@ or config already holds.
 never a hand-edited `.setup-draft.json`, never your own judgement about
 which question comes after which:**
 
-    /var/lib/hermes/skills/pt-shared/scripts/record_setup.py /var/lib/hermes/pt/config.json key=value [key=value ...]
+    /opt/plow/skills/pt-shared/scripts/record_setup.py /var/lib/plow/pt/config.json key=value [key=value ...]
 
 One line, no interpreter prefix, no shell operators — same rule SOUL.md
 gives `setup_needed.py`. `key` is a dot-path (`local_hour`,
@@ -52,7 +52,7 @@ in CHAT_VOICE (SOUL.md), answering what the owner actually said first.
 or Mac file write, and again after every `plow_get_result` poll, run this
 bare:
 
-    /var/lib/hermes/skills/pt-shared/scripts/chat_status.py --busy
+    /opt/plow/skills/pt-shared/scripts/chat_status.py --busy
 
 It POSTs at most two ⏳ lines ("tô nessa", then "ainda nisso" if it is
 still going). `STATUS:too-early` / `STATUS:already` is success; keep
@@ -83,7 +83,7 @@ a different `delivery.hour` (the owner's own HH:MM), run `topics.py check-paper
 --deliver-at main --main-hour <HH:MM>`; if it refuses, name its
 roster and leave the setting unchanged. After a valid change, re-run the gate
 and then re-run
-`/var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py` so the
+`/opt/plow/skills/pt-dashboard/scripts/register_crons.py` so the
 new schedule exists now — not an interview from the top, and never a
 hand-registered cron (see `pt-dashboard`).
 
@@ -116,7 +116,7 @@ English:
 a skip as accepting 07:00; a clock time they name ("8:30", "08:30") is
 that time. Record it and read the next question:
 
-    record_setup.py /var/lib/hermes/pt/config.json local_hour=07:00 owner.language=English
+    record_setup.py /var/lib/plow/pt/config.json local_hour=07:00 owner.language=English
 
 **Record `owner.language` in this same call**, as a plain-English name
 ("English", "Portuguese", "Mandarin Chinese"), read from what the owner
@@ -206,7 +206,7 @@ Latch parked or unreachable is also an answer, not a reason to skip
 
 - lpstat lists a printer:
 
-      record_setup.py /var/lib/hermes/pt/config.json printer.configured=true "printer.name=<exact CUPS name>"
+      record_setup.py /var/lib/plow/pt/config.json printer.configured=true "printer.name=<exact CUPS name>"
 
   as a bare invocation, two space-separated arguments. Use exactly what
   `lpstat` printed, not the display name (macOS turns `.`/spaces into `_`
@@ -217,7 +217,7 @@ Latch parked or unreachable is also an answer, not a reason to skip
 - lpstat's own output says there are none (e.g. "No destinations
   added."), Latch is parked, or the Mac is unreachable:
 
-      record_setup.py /var/lib/hermes/pt/config.json printer.configured=false
+      record_setup.py /var/lib/plow/pt/config.json printer.configured=false
 
   and say, in the owner's own language, that the paper still delivers in chat; printing
   joins automatically if a printer shows up later (that is the
@@ -226,7 +226,7 @@ Latch parked or unreachable is also an answer, not a reason to skip
   `exit_code` non-zero with output like "Bad file descriptor" rather
   than an actual destinations list or "No destinations added.": still
 
-      record_setup.py /var/lib/hermes/pt/config.json printer.configured=false
+      record_setup.py /var/lib/plow/pt/config.json printer.configured=false
 
   (never guess `true` without a real listing), but say plainly, in
   their language, that the printer check itself didn't run cleanly —
@@ -247,7 +247,7 @@ Stop. On their next message:
 - **No** → `record_setup.py <config path> priority.configured=false`
 - **An answer** → first put it in their wiki. Run `chat_status.py --busy` before the
   first Latch call and after each write; do not type that you are writing anything.
-  1. `/var/lib/hermes/skills/pt-shared/scripts/wiki_setup.py --desk` — it makes
+  1. `/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk` — it makes
      `~/Plow/wiki` ready (creating it when the Mac has none) and prints `WIKI:…`.
   2. `mcp__plow__plow_read_file` `path=~/Plow/wiki/entities/owner/goals.md`; add
      their answer as one `- ` line under `## Goals` unless it is already there, ending
@@ -307,11 +307,11 @@ Then record the outcome:
 
 - They said yes and **either** probe works:
 
-      record_setup.py /var/lib/hermes/pt/config.json mail.configured=true
+      record_setup.py /var/lib/plow/pt/config.json mail.configured=true
 
 - They said no, or both probes fail / the Mac is unreachable:
 
-      record_setup.py /var/lib/hermes/pt/config.json mail.configured=false
+      record_setup.py /var/lib/plow/pt/config.json mail.configured=false
 
   and say, **in the owner's own language, the one they've been writing
   this chat in**, that the letters column can join later the same way a
@@ -341,7 +341,7 @@ section in one session and three is the paper's news-roster ceiling. Never inven
 section they did not ask for. Then, regardless of whether they named
 any:
 
-    record_setup.py /var/lib/hermes/pt/config.json news_asked=true
+    record_setup.py /var/lib/plow/pt/config.json news_asked=true
 
 Send only the `NEXT_QUESTION` it prints — `close` — and move straight
 into the close step below (this one has no separate question to send;
@@ -365,10 +365,10 @@ Do not write `pt/config.json` until `NEXT_QUESTION` says `close`:
    loads, or none gives a usable IANA timezone, say the paper cannot be
    scheduled until the Mac can report where they are — do not invent a
    zone, do not ask them to type one.
-2. **Write** `/var/lib/hermes/pt/config.json` — with this exact bare
+2. **Write** `/var/lib/plow/pt/config.json` — with this exact bare
    invocation, never by composing the JSON yourself, never `write_file`:
 
-       /var/lib/hermes/skills/pt-setup/scripts/finalize_setup.py /var/lib/hermes/pt/config.json --owner-tz <IANA zone from step 1>
+       /opt/plow/skills/pt-setup/scripts/finalize_setup.py /var/lib/plow/pt/config.json --owner-tz <IANA zone from step 1>
 
    It reads the draft, stores the hour as the owner named it (in their
    own zone; `register_crons.py` moves it onto the container's clock),
@@ -380,14 +380,14 @@ Do not write `pt/config.json` until `NEXT_QUESTION` says `close`:
 
    If you want to re-check afterwards, the gate is:
 
-       /var/lib/hermes/skills/pt-shared/scripts/pt_config_gate.py /var/lib/hermes/pt/config.json
+       /opt/plow/skills/pt-shared/scripts/pt_config_gate.py /var/lib/plow/pt/config.json
 
    **Paste the gate's output verbatim.** Empty output is pass. Then run
-   `/var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py` and
+   `/opt/plow/skills/pt-dashboard/scripts/register_crons.py` and
    paste its output. Finally clear the draft — **with this exact bare
    invocation, never a `rm`, never an interpreter, never `os.remove`**:
 
-       record_setup.py /var/lib/hermes/pt/config.json --done
+       record_setup.py /var/lib/plow/pt/config.json --done
 
    It prints `DRAFT:cleared`. It is idempotent, and it refuses if the
    interview is somehow unfinished (it names what is missing) — that
