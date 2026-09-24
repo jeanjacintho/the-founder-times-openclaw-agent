@@ -119,6 +119,8 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
 - `scripts/set_signal_source.py <group_chat|email|imessage> <on|off>` — the
   ONLY way a finished config's signal switches change; gate-checked, atomic,
   prints `SIGNALS:group_chat=…,email=…,imessage=…`. Called bare.
+- `references/signal-triage.md` — the one priority / fyi / spam rubric for group
+  chats, mail and iMessage; the channel puts it in front of every group turn.
 - `references/config.example.json` — the config contract `pt_config_gate.py`
   enforces (including the optional `delivery.lead_minutes`, default 0, and
   optional `mail.configured`, default off)

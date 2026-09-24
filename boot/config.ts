@@ -69,7 +69,7 @@ export function renderConfig(identity: Identity, apiBase: string) {
     skills: { load: { extraDirs: ["/opt/plow/skills"] }, allowBundled: ["plow-no-bundled-skills"] },
     // Keep workspace and durable memory writes local instead of routing them through the Mac relay.
     tools: {
-      profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "plow_start_thread"], deny: ["ask_user", "secrets"],
+      profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "plow_start_thread", "plow_record_signal"], deny: ["ask_user", "secrets"],
       // The newspaper scripts' python3 is the image's 3.13 venv, never the system 3.11.
       exec: { pathPrepend: ["/opt/plow/pt-venv/bin"] },
     },

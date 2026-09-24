@@ -41,7 +41,7 @@ test("the injected context says the first action is done", () => {
   assert.match(text, /do not run it again/);
 });
 
-for (const room of ["owner-dm", "group"] as const) test(`an inbound ${room} turn ${room === "owner-dm" ? "starts from" : "skips"} the real gate`, async t => {
+for (const room of ["owner-dm", "group"] as const) test(`an inbound ${room} turn ${room === "owner-dm" ? "starts from the real gate" : "listens instead of the gate"}`, async t => {
   const home = await mkdtemp(`${tmpdir()}/pt-home-`);
   t.after(() => rm(home, { recursive: true }));
   await writeFile(`${home}/config.json`, JSON.stringify({ owner: { timezone: "UTC", language: "English" }, delivery: { hour: "07:00" }, printer: { configured: false } }));
@@ -80,7 +80,10 @@ for (const room of ["owner-dm", "group"] as const) test(`an inbound ${room} turn
     assert.ok(injected && injected !== "not-called");
     assert.match(injected.prependContext!, /```text\nREADY\nLANG:English\n```/);
   } else {
-    assert.equal(injected, undefined);
+    // A group never gets setup; it gets the listen-only instructions.
+    assert.ok(injected && injected !== "not-called");
+    assert.match(injected.prependContext!, /GROUP LISTENING/);
+    assert.doesNotMatch(injected.prependContext!, /READY/);
   }
 });
 
@@ -102,9 +105,9 @@ test("the hook recognizes the owner's DM turn from its own context", () => {
 for (const [label, ctx, injects] of [
   ["owner's DM", { channel: "plow", accountId: "chat", sessionKey: "agent:main:main", trigger: "user" }, true],
   ["heartbeat in the main session", { channel: "plow", accountId: "chat", sessionKey: "agent:main:main", trigger: "heartbeat" }, false],
-  ["a group", { channel: "plow", accountId: "chat", sessionKey: "agent:main:plow:group:cht_group", trigger: "user" }, false],
+  ["a group", { channel: "plow", accountId: "chat", sessionKey: "agent:main:plow:group:cht_group", trigger: "user" }, "listen"],
   ["a scheduled job", { sessionKey: "cron:pt-daily-edition", trigger: "cron" }, false],
-] as const) test(`outside dispatch, ${label} ${injects ? "starts from" : "skips"} the real gate`, async t => {
+] as const) test(`outside dispatch, ${label} ${injects === "listen" ? "listens instead of" : injects ? "starts from" : "skips"} the real gate`, async t => {
   const home = await mkdtemp(`${tmpdir()}/pt-home-`);
   t.after(() => rm(home, { recursive: true }));
   await writeFile(`${home}/config.json`, JSON.stringify({ owner: { timezone: "UTC", language: "English" }, delivery: { hour: "07:00" }, printer: { configured: false } }));
@@ -115,6 +118,9 @@ for (const [label, ctx, injects] of [
   entry.register({ registrationMode: "full", registerTool() {}, logger: { info() {} }, registerChannel() {}, runtime: {},
     on(name: string, handler: typeof hook) { if (name === "before_prompt_build") hook = handler; } } as never);
   const result = await hook!({ prompt: "oi", messages: [] }, ctx);
-  if (injects) assert.match(result!.prependContext!, /```text\nREADY\nLANG:English\n```/);
+  if (injects === "listen") {
+    assert.match(result!.prependContext!, /GROUP LISTENING/);
+    assert.doesNotMatch(result!.prependContext!, /READY/);
+  } else if (injects) assert.match(result!.prependContext!, /```text\nREADY\nLANG:English\n```/);
   else assert.equal(result, undefined);
 });
