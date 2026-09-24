@@ -237,8 +237,8 @@ A, `nba`, `nfl`, ...) — confirm the exact slug for the owner's league in
 the same Latch browser session (ESPN's own site URL for that league's
 scores page names it) rather than guessing. Then `plow_browser` `action:
 "goto"` that scoreboard URL and `action: "text"` to read the JSON. Do
-not `curl` it, do not `plow_run_command` it, do not use Hermes
-`web_extract`. It needs no Latch Google connector and no login, unlike
+not `curl` it, do not `plow_run_command` it, do not use a container web
+tool (`web_fetch`). It needs no Latch Google connector and no login, unlike
 mail — but it still has to be the Mac's browser.
 
 From the response, find each followed team's own game (by team name/abbr

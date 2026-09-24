@@ -16,7 +16,7 @@ def is_portuguese(language):
 
     Accepts the plain-English name `record_owner_language.py` stores
     ("Português"), the bare tag, and every region: pt-BR, pt-PT, pt-AO, and
-    the underscore forms Hermes sometimes passes through.
+    the underscore forms a runtime sometimes passes through.
     """
     tag = (language or "").lower().replace("_", "-")
     return "portug" in tag or tag == "pt" or tag.startswith("pt-")

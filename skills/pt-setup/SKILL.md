@@ -152,9 +152,8 @@ Latch's `plow_run_command` schema requires **`argv`** and runs the array
 directly — no shell, no `~`. Its optional keys (`goal`, `network`, `cwd`,
 `read_paths`, `write_paths`, `apple_events`, `wait_ms`, …) are fine;
 `additionalProperties: false` rejects anything else, so the relay errors
-and the Mac never sees `lpstat`. Hermes names the tool
-`mcp__plow__plow_run_command` (or `mcp__latch__plow_run_command` if
-`tools_list` says so). **Never send `"command"`.**
+and the Mac never sees `lpstat`. OpenClaw names the tool
+`plow__plow_run_command` (MCP server `plow`, then the Latch tool name). **Never send `"command"`.**
 
 **This call needs `"network": true`.** `lpstat` reaches `cupsd` over a
 local Unix domain socket, and Latch's sandbox grants socket access only

@@ -7,8 +7,8 @@ Originally the fallback for a run with no --deliver arm. Promoted to the
 PRIMARY chat leg (not a fallback) after measuring cron/scheduler.py's own
 delivery live: the same unchanged content, run to run, both delivered fine
 via --deliver and was silently discarded with "Fire claim ownership lost;
-stale result was discarded" -- a genuine intermittent race in Hermes' own
-cron heartbeat/claim mechanism, not anything about this script's content.
+stale result was discarded" -- a genuine intermittent race in the previous
+runtime's cron heartbeat/claim mechanism, not anything about this script's content.
 Calling the Plow Chat REST API directly, the same three calls
 plow-chat-platform's own adapter makes internally (declare an attachment,
 PUT the bytes to its signed upload_url, POST the message with
