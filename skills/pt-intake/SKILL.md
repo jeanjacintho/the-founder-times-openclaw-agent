@@ -94,7 +94,7 @@ my cousin, not a customer", "stop telling me to hire", "we signed our first pilo
 is not a topic. Run `/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk` first
 (idempotent; it seeds or carries over the page) — an `error:` line means the Mac's wiki
 isn't reachable: say so in one line and write nothing, the correction will need resending.
-Then `mcp__plow__plow_read_file` `~/Plow/wiki/entities/owner/goals.md`, append one line
+Then `plow__plow_read_file` `~/Plow/wiki/entities/owner/goals.md`, append one line
 dated today (`- YYYY-MM-DD: …`, an answer starting with its `Q<n>`) ending with its item, the
 same shape the Q&A uses: a Messages chat plus rowid, or a named mail reader's message id, of the owner's own
 message that carried the correction — a correction made in chat **is** a re-openable item only when
@@ -104,7 +104,7 @@ write nothing — an unsupported correction is not one the line may pin. File it
 whichever fits, set `updated:` to today. Read it again immediately before the write and fold
 whatever changed since the first read into what you write — the owner edits this page in
 Obsidian, and their line is evidence of what they say, never something a pass drops. Then
-`mcp__plow__plow_write_file` it back with every other line unchanged. The confirmation is the
+`plow__plow_write_file` it back with every other line unchanged. The confirmation is the
 contract, not a courtesy: say the line was written and name the page; if `wiki_setup.py --desk`,
 the read, or the write fails, say that instead — never confirm as though the correction landed,
 since one the owner has to repeat is one the paper has already lost. Only the owner's own

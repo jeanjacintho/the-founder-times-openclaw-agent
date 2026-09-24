@@ -85,11 +85,11 @@ On a compacted or restated turn, the first action is to read `RUN_PAGE` and obey
 Never infer the active page from timestamps or delegate a stage recorded there as complete.
 
 Every child returns compact structured JSON with no narrative preface.
-**Delegate payloads are short pointers:** include the exact `RUN_PAGE`, stage, generation, target
+**Child task payloads are short pointers:** include the exact `RUN_PAGE`, stage, generation, target
 index or label, and the concise stage procedure and result schema defined below. The child reads `RUN_PAGE` first
 and obtains its target, evidence locations, and prior results there. Do not inline the run state,
-read receipts, or tool output in the delegation payload.
-Immediately after every delegate set returns, the parent's next action is to reduce its results
+read receipts, or tool output in the child's task payload.
+Immediately after every spawn set returns, the parent's next action is to reduce its results
 into the run's wiki state page before any other model work. Keep only decisions, priority cases,
 sanitized reads, public evidence locations, unknowns, and verdicts; never copy tool transcripts
 or hidden reasoning. This page, not conversational memory, is the in-progress tournament state.
@@ -100,7 +100,7 @@ resource catalog. All current-source research happens inside the bounded challen
 children. This keeps a three-generation tournament recoverable across context compaction.
 
 Read tools from their installed documentation before using them. Mail uses the
-`google-workspace` skill; Messages uses `mcp__plow__plow_read_skill` with `name` = `imessage`;
+`google-workspace` skill; Messages uses `plow__plow_read_skill` with `name` = `imessage`;
 calendar uses the shared desk procedure; public and authenticated pages use the installed browser
 skill. Do not assume audit or tool-call history exists. Current source content outranks remembered
 history.
@@ -109,24 +109,26 @@ history.
 
 Begin each generation with **one to three inherited champions and three challengers**. On the first
 run, there may be no inherited champion; advisor-seeded proposals enter as challengers rather than
-invented incumbents. Run the following stages with `delegate_task` children that cannot delegate.
+invented incumbents. Run the following stages with `sessions_spawn` children (`context: "isolated"`), which cannot
+spawn children of their own. A spawn set is every child of one stage, spawned back to back; then
+call `sessions_yield` and keep yielding until every child in the set has returned its result.
 
 ### Mechanical loop (authoritative)
 
 Let `I` be the number of inherited champions at the start of this generation. Execute this loop in
 order; the stage sections below define each payload, but never reorder or merge these gates:
 
-1. Make one `delegate_task` call containing exactly three writer tasks.
+1. Spawn one set of exactly three writer children.
 2. Rewrite `RUN_PAGE` with all three Challenge results and set its `Stage` to Challenge complete.
-   Do not make another `delegate_task` call until that wiki write returns success.
-3. Make one `delegate_task` call whose critic task count is `I + 3`: one task for each inherited
+   Do not spawn another child until that wiki write returns success.
+3. Spawn one set whose critic child count is `I + 3`: one child for each inherited
    champion and one for each challenger, so there is one independent critic per recommendation.
-   With three inherited champions, this is six independent critic children in one delegate set.
+   With three inherited champions, this is six independent critic children in one spawn set.
 4. Rewrite `RUN_PAGE` with every critic result and set its `Stage` to Criticize complete. Do not
    call the culler until that wiki write returns success.
 5. Every generation reaches Cull unless fewer than three fully criticized targets remain. With
    fewer than three, the generation is invalid and the prior checkpoint stands. Otherwise make
-   one one-task `delegate_task` call for Cull.
+   a spawn set of one child for Cull.
 6. Rewrite `RUN_PAGE` with Cull and set its `Stage` to Cull complete before taking another action.
    Recovery from `Cull complete` proceeds to the next required action.
 7. Generations one and two advance from their wiki Cull checkpoint: immediately start the next
