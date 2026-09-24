@@ -3,6 +3,7 @@ import { readFile, mkdir, writeFile, rm } from "node:fs/promises";
 import { startAgentIndex } from "./agent-index.js";
 import { renderConfig } from "./config.js";
 import { identityFromApi } from "./identity.js";
+import { newspaperEnv } from "./newspaper-env.js";
 import { renderPrompt } from "./prompt.js";
 import { startGateway } from "./process.js";
 
@@ -14,7 +15,9 @@ try {
   process.env.PLOW_MCP_BRIDGE_TOKEN = randomBytes(32).toString("hex");
   const identity = await identityFromApi(base, process.env.PLOW_AGENT_TOKEN);
   const config = renderConfig(identity, base);
+  Object.assign(process.env, newspaperEnv(identity));
   await mkdir("/var/lib/plow/workspace", { recursive: true });
+  await mkdir("/var/lib/plow/pt", { recursive: true, mode: 0o700 });
   for (const name of ["BOOTSTRAP.md", "SOUL.md", "IDENTITY.md", "USER.md"]) {
     await rm(`/var/lib/plow/workspace/${name}`, { force: true });
   }
