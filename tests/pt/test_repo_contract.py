@@ -1037,6 +1037,13 @@ class TestDeployment:
         for key in ("apiBase", "lineUid", "emailLineUid", "groups"):
             assert key in properties, key
 
+    def test_the_index_listing_names_its_runtime(self):
+        # A fresh install (new install id) registers its page again; without
+        # a runtime the Index labelled this OpenClaw agent "Hermes".
+        dockerfile = self.DOCKERFILE.read_text()
+        assert 'AGENT_RUNTIME="OpenClaw 2.0"' in dockerfile
+        assert '["--runtime", process.env.AGENT_RUNTIME]' in (REPO / "boot" / "agent-index.ts").read_text()
+
     def test_base_config_pins_the_paper_model_and_its_limits(self):
         config = (REPO / "boot" / "config.ts").read_text()
         assert 'primary: "plow/z-ai/glm-5.2"' in config

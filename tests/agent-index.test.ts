@@ -38,14 +38,14 @@ test("no AGENT_ID reports for nobody, so nothing runs", async t => {
 });
 
 test("an unregistered install registers, then reports", async t => {
-  env(t, { AGENT_ID: "my-agent", AGENT_NAME: "My Agent", AGENT_BLURB: "What it does", PLOW_API_BASE: "https://api.example", PLOW_AGENT_TOKEN: "token", OPENCLAW_STATE_DIR: "/custom/openclaw" });
+  env(t, { AGENT_ID: "my-agent", AGENT_NAME: "My Agent", AGENT_BLURB: "What it does", AGENT_RUNTIME: "OpenClaw 2.0", PLOW_API_BASE: "https://api.example", PLOW_AGENT_TOKEN: "token", OPENCLAW_STATE_DIR: "/custom/openclaw" });
   const calls = fakeClient(t, [0, 3, 0, 0]);
   startAgentIndex()?.close?.();
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.deepEqual(calls.map(call => call.args), [
     ["agentsview", "sync"],
     ["status"],
-    ["--register", "--agent", "my-agent", "--name", "My Agent", "--blurb", "What it does"],
+    ["--register", "--agent", "my-agent", "--name", "My Agent", "--blurb", "What it does", "--runtime", "OpenClaw 2.0"],
     ["--agent", "my-agent"],
   ]);
   // The Plow bearer buys the Index key once; reports go out on the key the client stored.
