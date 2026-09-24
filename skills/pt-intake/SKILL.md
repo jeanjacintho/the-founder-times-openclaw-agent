@@ -85,6 +85,9 @@ These are ordinary turns, not classifications. Do them and end:
   (`plow-gog gmail search`) first, Mail.app only if that fails** (same
   argv order as pt-setup). Validate with the gate, then confirm in one line.
   The daily job already exists; no extra cron.
+- **"listen to my groups / mail / iMessage" / "stop listening to …"** —
+  `pt-setup`'s "Turning a signal source on or off": probe first for mail and
+  iMessage, then `set_signal_source.py <source> <on|off>`. Confirm in one line.
 
 ## Corrections for the advisor desk
 

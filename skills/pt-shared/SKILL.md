@@ -116,6 +116,9 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
   `category: priority` from a source switched on in `config.json` `signals`
   becomes a file; spam, fyi, duplicates and empty text are refused with a
   `reason`. Never write `pt/signals/` with the write or edit tools.
+- `scripts/set_signal_source.py <group_chat|email|imessage> <on|off>` — the
+  ONLY way a finished config's signal switches change; gate-checked, atomic,
+  prints `SIGNALS:group_chat=…,email=…,imessage=…`. Called bare.
 - `references/config.example.json` — the config contract `pt_config_gate.py`
   enforces (including the optional `delivery.lead_minutes`, default 0, and
   optional `mail.configured`, default off)

@@ -64,6 +64,9 @@ def build(draft, owner_tz):
             "name": printer.get("name") if printer.get("configured") else None,
         },
         "mail": {"configured": bool((draft.get("mail") or {}).get("configured"))},
+        # Priority-signal sources: next_question() only reaches close once all
+        # three are real booleans, so this is a copy, never a default.
+        "signals": {source: draft["signals"][source] is True for source in _record.SIGNAL_SOURCES},
     }
     if isinstance(priority.get("configured"), bool):
         config["priority"] = {"configured": bool(priority.get("configured"))}

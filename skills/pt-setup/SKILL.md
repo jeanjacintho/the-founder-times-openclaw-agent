@@ -23,13 +23,14 @@ which question comes after which:**
 
 One line, no interpreter prefix, no shell operators — same rule SOUL.md
 gives `setup_needed.py`. `key` is a dot-path (`local_hour`,
-`printer.configured`, `printer.name`, `priority.configured`, `mail.configured`, `news_asked`);
+`printer.configured`, `printer.name`, `priority.configured`, `mail.configured`, `news_asked`,
+`signals.group_chat`, `signals.email`, `signals.imessage`);
 `true`/`false` become real JSON booleans, anything else stays a string. A
 value with a space needs its own quoting, e.g. `printer.name="HP LaserJet 4"`.
 It prints two lines:
 
     DRAFT:<fields already recorded>
-    NEXT_QUESTION=<hour|printer|priority|mail|news|close>
+    NEXT_QUESTION=<hour|printer|priority|mail|news|signals|close>
 
 **Send exactly the one message `NEXT_QUESTION` calls for, then stop.**
 Not that question plus the probe for the one after it. Not that question
@@ -77,7 +78,8 @@ English:
 **a second (or third) daily delivery time** (`delivery.extra_hours`, a list
 of "HH:MM" strings alongside `delivery.hour`, each in the owner's own
 clock like `delivery.hour` itself — never ask the zone again), **turning the letters desk
-on or off** (`mail.configured`), or a new printer is a
+on or off** (`mail.configured`), **turning a signal source on or off**
+(see below), or a new printer is a
 one-line conversation that updates `pt/config.json` directly. Before writing
 a different `delivery.hour` (the owner's own HH:MM), run `topics.py check-paper
 --deliver-at main --main-hour <HH:MM>`; if it refuses, name its
@@ -86,6 +88,18 @@ and then re-run
 `/opt/plow/skills/pt-dashboard/scripts/register_crons.py` so the
 new schedule exists now — not an interview from the top, and never a
 hand-registered cron (see `pt-dashboard`).
+
+**Turning a signal source on or off** after setup is one bare call,
+never a hand-edited config:
+
+    /opt/plow/skills/pt-shared/scripts/set_signal_source.py group_chat on
+    /opt/plow/skills/pt-shared/scripts/set_signal_source.py email on
+    /opt/plow/skills/pt-shared/scripts/set_signal_source.py imessage on
+
+(`off` to stop). Before `email on` or `imessage on`, run the same probe as
+5b and switch nothing on if it fails. It prints
+`SIGNALS:group_chat=…,email=…,imessage=…`; confirm in one line. No cron
+changes: the daily paper reads the switches itself.
 
 ## The questions, in order
 
@@ -342,7 +356,45 @@ any:
 
     record_setup.py /var/lib/plow/pt/config.json news_asked=true
 
-Send only the `NEXT_QUESTION` it prints — `close` — and move straight
+Send only the `NEXT_QUESTION` it prints (question 5a), then stop.
+
+**5a. Ask which signals the paper may listen to.** Copy the locked line.
+Every source starts off; this is how the owner turns any of them on.
+Send only this, then stop.
+
+Portuguese:
+
+> 👂 Quer que eu escute pra achar prioridades? Posso ouvir os grupos em que eu estiver (sem falar nada lá), seus e-mails e seus iMessages recebidos — filtrando spam e newsletter. Diga quais: grupos / e-mail / iMessage / nenhum.
+
+English:
+
+> 👂 Want me to listen for priorities? I can follow the group chats I'm in (without ever talking there), your incoming mail and your incoming iMessages — spam and newsletters filtered out. Say which: groups / mail / iMessage / none.
+
+**5b. On their next message**, map what they named to three switches —
+"nenhum" / "none" / "not now" is all three off. Before recording `true`:
+
+- **email** needs Google reachable. If `mail.configured` is already
+  `true`, 3b's probe proved it; otherwise run 3b's Google probe (same exact
+  argv) and record `false` if it fails.
+- **imessage** needs one probe through Latch — `chat_status.py --busy`
+  first — with **exactly** the argv the daily scan uses, so the Mac's
+  "always allow" covers the unattended runs:
+
+```json
+{ "argv": ["plow-messages", "search", "--limit", "200", "--order", "desc"], "read_paths": ["~/Library/Messages"], "goal": "Read incoming iMessages for the paper's priority signals" }
+```
+
+  A result (even zero rows) works; `blocked`, an error or an unreachable
+  Mac records `false`.
+- **group_chat** needs no probe.
+
+Then, in one call:
+
+    record_setup.py /var/lib/plow/pt/config.json signals.group_chat=<true|false> signals.email=<true|false> signals.imessage=<true|false>
+
+If a source they asked for failed its probe, say in one line, in the
+owner's language, that it can be switched on later. Send only the
+`NEXT_QUESTION` it prints — `close` — and move straight
 into the close step below (this one has no separate question to send;
 "close" means do the close work now).
 

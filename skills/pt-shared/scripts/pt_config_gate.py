@@ -95,6 +95,9 @@ class GateError(Exception):
     """
 
 
+SIGNAL_SOURCES = ("group_chat", "email", "imessage")
+
+
 def _index(value, key):
     """dict get with a loud refusal on non-object shapes."""
     if value is None:
@@ -198,6 +201,20 @@ def gate(config):
     priority = _index(config, "priority")
     if priority is not None and not isinstance(_index(priority, "configured"), bool):
         failures.append("priority.configured is not a boolean")
+
+    # 11. signals, when present, switches the priority-signal sources: an
+    #     object whose keys are group_chat / email / imessage, each a boolean.
+    #     Absent means every source is off (an install from before signals).
+    signals = _index(config, "signals")
+    if signals is not None:
+        if not isinstance(signals, dict):
+            failures.append("signals is not an object")
+        else:
+            for source, switch in signals.items():
+                if source not in SIGNAL_SOURCES:
+                    failures.append(f"signals.{source} is not a signal source")
+                elif not isinstance(switch, bool):
+                    failures.append(f"signals.{source} is not a boolean")
 
     # 9. no leftover [UPPER_SNAKE] placeholder anywhere.
     if any(_PLACEHOLDER_RE.match(s) for s in _all_strings(config)):

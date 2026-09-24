@@ -558,6 +558,28 @@ class TestSoul:
         assert '"⏳ ' in status
         assert "--busy" in status
 
+    def test_setup_asks_which_signal_sources_to_listen_to(self):
+        # Question 5 switches the priority-signal sources. Every source starts
+        # off; the owner names them, and the iMessage probe uses the scan's
+        # exact argv so the Mac's "always allow" covers the unattended scan.
+        soul = (AGENTS).read_text()
+        setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
+        assert "| Asking which signals to listen to | 👂 |" in soul
+        assert "> 👂 Quer que eu escute" in setup
+        assert "> 👂 Want me to listen" in setup
+        assert "NEXT_QUESTION=<hour|printer|priority|mail|news|signals|close>" in setup
+        for field in ("signals.group_chat", "signals.email", "signals.imessage"):
+            assert field in setup
+        assert '"plow-messages", "search", "--limit", "200", "--order", "desc"' in setup
+
+    def test_signal_sources_change_later_only_through_their_script(self):
+        setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
+        intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
+        for text in (setup, intake):
+            assert "set_signal_source.py" in text
+        for source in ("group_chat", "email", "imessage"):
+            assert f"set_signal_source.py {source} on" in setup
+
     def test_setup_posts_a_hang_on_while_latch_work_runs(self):
         # Typed mid-turn text is dropped on plow_chat. Slow setup work
         # (printer probe, Mac files, location) has to POST a hang-on

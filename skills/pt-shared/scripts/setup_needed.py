@@ -73,6 +73,10 @@ def draft_line(config_path):
         fields.append("mail")
     elif isinstance(draft.get("mail.configured"), bool):
         fields.append("mail")
+    signals = draft.get("signals")
+    if isinstance(signals, dict) and all(
+            isinstance(signals.get(s), bool) for s in ("group_chat", "email", "imessage")):
+        fields.append("signals")
     return "DRAFT:" + (",".join(fields) if fields else "none")
 
 

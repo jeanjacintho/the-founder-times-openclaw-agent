@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from conftest import load_module
 
 record = load_module("record_setup", "pt-shared/scripts/record_setup.py")
@@ -57,8 +59,24 @@ class TestNextQuestion:
             "priority": {"configured": True},
             "mail": {"configured": True},
             "news_asked": True,
+            "signals": {"group_chat": False, "email": True, "imessage": False},
         }
         assert record.next_question(draft) == "close"
+
+    def test_news_answered_asks_signals(self):
+        draft = {"local_hour": "07:00", "printer": {"configured": False}, "priority": {"configured": True},
+                 "mail": {"configured": True}, "news_asked": True}
+        assert record.next_question(draft) == "signals"
+
+    @pytest.mark.parametrize("signals", [
+        {"group_chat": True},
+        {"group_chat": True, "email": False, "imessage": "false"},
+        "all",
+    ])
+    def test_incomplete_signals_is_still_open(self, signals):
+        draft = {"local_hour": "07:00", "printer": {"configured": False}, "priority": {"configured": True},
+                 "mail": {"configured": True}, "news_asked": True, "signals": signals}
+        assert record.next_question(draft) == "signals"
 
     def test_printer_configured_string_not_bool_asks_printer(self):
         # A stray {"printer": {"configured": "true"}} (string, not bool) --
@@ -140,7 +158,13 @@ class TestCLI:
         rc = record.main(["record_setup.py", str(config), "news_asked=true"])
         assert rc == 0
         out = capsys.readouterr().out.strip().splitlines()
-        assert out == ["DRAFT:local_hour,printer,priority,mail", "NEXT_QUESTION=close"]
+        assert out == ["DRAFT:local_hour,printer,priority,mail", "NEXT_QUESTION=signals"]
+        rc = record.main(["record_setup.py", str(config), "signals.group_chat=true",
+                          "signals.email=false", "signals.imessage=false"])
+        assert rc == 0
+        out = capsys.readouterr().out.strip().splitlines()
+        assert out == ["DRAFT:local_hour,printer,priority,mail,signals", "NEXT_QUESTION=close"]
+        assert draft_of(tmp_path)["signals"] == {"group_chat": True, "email": False, "imessage": False}
 
     def test_too_few_args_is_a_usage_error(self, capsys):
         rc = record.main(["record_setup.py"])
@@ -179,6 +203,7 @@ class TestDoneClearsTheDraft:
         "priority": {"configured": False},
         "mail": {"configured": True},
         "news_asked": True,
+        "signals": {"group_chat": False, "email": True, "imessage": False},
     }
 
     def write_draft(self, tmp_path, draft):
