@@ -75,6 +75,13 @@ COPY boot /opt/plow/boot
 COPY plugin /opt/plow/plugin
 COPY prompt /opt/plow/prompt
 COPY skills /opt/plow/skills
+# Root-owned and read-only to the agent: a script a turn could rewrite is a
+# script a web page could rewrite. Executables keep their bit from git.
+RUN chown -R root:root /opt/plow/skills \
+ && find /opt/plow/skills -type d -exec chmod 0755 {} + \
+ && find /opt/plow/skills -type f ! -perm -u+x -exec chmod 0644 {} + \
+ && find /opt/plow/skills -type f -perm -u+x -exec chmod 0755 {} + \
+ && install -d -o node -g node -m 0700 /var/lib/plow/pt
 COPY build.ts /opt/plow/build.ts
 COPY package.json package-lock.json tsconfig.json /opt/plow/
 
