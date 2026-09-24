@@ -121,3 +121,10 @@ test("the base image uses boot-owned config without the OpenClaw browser UI", ()
   assert.equal(config.agents.defaults.skipBootstrap, true);
   assert.deepEqual(config.meta, {});
 });
+
+test("the Plow plugin may register its setup-gate prompt hook", () => {
+  assert.deepEqual(renderConfig(identity, "http://api:8000").plugins, {
+    load: { paths: ["/opt/plow/plugin"] },
+    entries: { plow: { enabled: true, hooks: { allowConversationAccess: true } } },
+  });
+});

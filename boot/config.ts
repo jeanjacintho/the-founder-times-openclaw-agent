@@ -43,7 +43,9 @@ export function renderConfig(identity: Identity, apiBase: string) {
       requestTimeoutMs: 300_000,
       headers: { Authorization: "Bearer ${PLOW_MCP_BRIDGE_TOKEN}" },
     } } } } : {}),
-    plugins: { load: { paths: ["/opt/plow/plugin"] }, entries: { plow: { enabled: true } } },
+    // The channel runs the newspaper setup gate in a before_prompt_build hook; OpenClaw
+    // registers conversation hooks of a non-bundled plugin only with this opt-in.
+    plugins: { load: { paths: ["/opt/plow/plugin"] }, entries: { plow: { enabled: true, hooks: { allowConversationAccess: true } } } },
     channels: { plow: {
       apiBase, lineUid: identity.line.uid,
       ...(email?.type === "agent" ? { emailLineUid: email.line.uid } : {}),
