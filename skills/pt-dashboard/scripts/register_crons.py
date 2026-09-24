@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 """Register the Founder Times' crons, idempotently, from the topic store.
 
-Why this exists at all. `hermes cron` persists jobs to
-/var/lib/hermes/cron/jobs.json, which no rebuild replays -- so a rebuilt
-agent would come up with subscriptions that never fire and nothing to diff
-against. Keeping the spec here, derived from pt/topics.json (the one record
-of what the owner asked to be watched), means "set up the plow times crons"
-replays a reviewed derivation instead of improvising schedules from a
-sentence. The same mechanism ld-dashboard's register_crons.py uses, with a
-spec that is data-driven rather than fixed: the topic list changes.
+Why this exists at all. The scheduler keeps its jobs in the gateway's state
+volume; a fresh volume has none, and nothing else replays them. Keeping the
+spec here, derived from pt/topics.json (the one record of what the owner
+asked to be watched), means "set up the plow times crons" replays a reviewed
+derivation instead of improvising schedules from a sentence. The spec is
+data-driven rather than fixed: the topic list changes.
 
 The spec (design doc §3.6 and the personalized-paper plan §3.3/§6):
 
   pt-daily-edition       <min> <hour> * * *        one job; exists while
                          computed as                setup can register
                          delivery.hour -
-                         lead_minutes (owner
-                         zone, never before
-                         midnight)
+                         lead_minutes (never
+                         before midnight)
   pt-daily-edition-<n>   same, extra_hours         reprint of the MAIN paper
                          (n ≥ 2)                    (unscoped sections), not
                                                     a different roster
@@ -32,41 +29,34 @@ The spec (design doc §3.6 and the personalized-paper plan §3.3/§6):
   pt-daily-edition-now   one-shot, a minute out    --now: the main paper on
                                                    demand, same prompt, no hold
 
+Every cron job is registered with `--tz owner.timezone`: every stored hour --
+delivery.hour, extra_hours, a section's deliver_at -- is the owner's wall
+clock, and the scheduler fires on it directly, daylight saving included.
+post_to_chat.py's --hold-until waits on the same zone. Each job is an agent
+turn in an isolated session with delivery `none`; the paper reaches chat
+through post_to_chat.py.
+
 This script therefore CREATES missing jobs and REMOVES pt-* jobs whose
 topic is gone -- cancelled, delivered one-offs, or names with no topic
-behind them. "Created/removed as topics change", the design doc calls it. It never touches a job whose name does
-not start with pt-: those are not this agent's to manage.
+behind them. It never touches a job whose name does not start with pt-:
+those are not this agent's to manage (OpenClaw keeps its own jobs, such as
+its heartbeat, in the same list).
 
 It also RECONCILES drift, which create-if-missing alone does not: a job
-that is registered with a different schedule, skill or prompt than the spec
-calls for (the owner changed delivery.hour, the lead changed, the delivery
-contract moved -- PDF-only vs transcript) is updated in place with
-`hermes cron edit`. Without this, "already present, skipped" means a
-changed delivery hour or a new chat payload is silently ignored forever --
-the exact class of failure this script exists to prevent. Drift is only
-judged when hermes's own jobs.json carries the field; a fixture or an older
-row without a schedule is left alone rather than edited on a guess. A
-blank PLOW_HOME_CHANNEL (typical of docker compose exec, which does not
-inherit s6's env) must refuse before any create or edit, while the
-existing morning job is still registered. Never remove-then-create a
-drifted job: if create failed after remove, the morning paper had no job
-until someone reran the script.
+that is registered with a different schedule, zone, prompt or model than
+the spec calls for is updated in place with `cron edit`. Drift is only
+judged on a field the scheduler reported; a missing field is left alone
+rather than edited on a guess. Never remove-then-create a drifted job: if
+create failed after remove, the morning paper had no job until someone
+reran the script.
 
-One refusal is the point of the script, inherited from ld-dashboard: an
-unreadable or unexpected jobs.json aborts. Never read "I could not tell what
-is registered" as "nothing is" -- that re-registers every job and duplicates
+One refusal is the point of the script: an unreadable, partial or
+unexpected job listing aborts. Never read "I could not tell what is
+registered" as "nothing is" -- that re-registers every job and duplicates
 all of them.
 
-Every stored hour -- delivery.hour, extra_hours, a section's deliver_at --
-is the owner's wall clock in owner.timezone. `hermes cron create` takes no
-per-job zone and fires on the container's clock (TZ), as post_to_chat.py's
---hold-until waits on it, so this script converts each hour into TZ when it
-registers, on today's date. A config still carrying delivery.local_hour was
-written when delivery.hour was on the container's clock; adopt_owner_clock()
-retires it on the next registration.
-
-It runs INSIDE the container, where /opt/hermes/bin/hermes and that file
-live -- from a turn, which inherits PLOW_HOME_CHANNEL from the gateway.
+It runs INSIDE the container, from a turn: exec inherits the gateway token
+the scheduler CLI needs.
 """
 from __future__ import annotations
 
@@ -75,8 +65,6 @@ import json
 import os
 import pathlib
 import re
-import shutil
-import subprocess
 import sys
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -85,11 +73,9 @@ _SKILLS = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..")
 sys.path[:0] = [os.path.join(_SKILLS, "pt-intake", "scripts"), os.path.join(_SKILLS, "pt-shared", "scripts")]
 from record_owner_language import _write_json  # noqa: E402 -- the config's atomic writer
 from pt_paths import config_file, script  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from cron_backend import MODEL, OPENCLAW, CronBackend  # noqa: E402 -- sibling module
 
-HERMES = "/opt/hermes/bin/hermes"
-# Where `hermes cron` persists its jobs -- nothing replays it on a rebuild,
-# which is the reason this script exists.
-JOBS_FILE = "/var/lib/hermes/cron/jobs.json"
 CONFIG_FILE = str(config_file())
 # The only job names this spec owns. Pinned as a fullmatch so a name that
 # does not parse is never interpreted, and a half-matching id never removes
@@ -122,8 +108,7 @@ STALE_RUN_MINUTES = 240
 # One topic's own edition: a subscription's nightly run or a one-off.
 TOPIC_PROMPT = (
     "Run pt-research on topic {tid} now (depth {depth}), then pt-edition for it, "
-    "delivering with post_to_chat.py per pt-edition/SKILL.md step 2. Final "
-    "response is NO_REPLY so --deliver does not send the text a second time."
+    "delivering with post_to_chat.py per pt-edition/SKILL.md step 2."
 )
 
 
@@ -138,7 +123,7 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
     checkpoint when one exists, else runs the tournament.
 
     hold_until is the send clock (delivery.hour / an extra or focused hour).
-    Cron may start earlier via lead_minutes; POST must still wait. The
+    The job may start earlier via lead_minutes; POST must still wait. The
     on-demand copy (--now) passes none, posts when done, and never waits
     ~150 minutes on a tournament: it reuses the newest accepted checkpoint
     of any date, printed with its as-of date, and runs the tournament only
@@ -179,7 +164,7 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
         f"Run {title} now, in one session. First run {lock} acquire "
         f"--name {WORKSPACE_LOCK}-<today's date in the owner's "
         f"zone> --stale-minutes {STALE_RUN_MINUTES + lead_minutes}; if its output is 'held', "
-        f"another paper owns the workspace -- say NO_REPLY and stop. Then "
+        f"another paper owns the workspace -- stop. Then "
         f"/opt/plow/skills/pt-shared/scripts/prepare_daily_run.py --preserve-priority "
         f"(it archives prior scratch after the lock; do not inspect or reuse old run files). Then "
         f"/opt/plow/skills/pt-intake/scripts/topics.py reopen-sections "
@@ -192,29 +177,12 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
         f"then every other standing desk it lists, in its order, then {roster}. "
         f"Then run pt-edition for the batch, delivering with post_to_chat.py "
         f"per pt-edition/SKILL.md step 2{hold}. "
-        f"Release the lock with {lock} release --name the same {WORKSPACE_LOCK}-<date>. "
-        f"Final response is NO_REPLY so --deliver does not send the transcript."
+        f"Release the lock with {lock} release --name the same {WORKSPACE_LOCK}-<date>."
     )
 
 
-DELIVER_TARGET = "plow_chat:${PLOW_HOME_CHANNEL}"
-
-
-def load_zones(config_path=CONFIG_FILE, env=None):
-    """(owner zone, container zone), or refuse.
-
-    Refused: a container with no TZ (nothing here can name the clock cron
-    fires on) and a config without owner.timezone.
-    """
-    env = os.environ if env is None else env
-    container = (env.get("TZ") or "").strip()
-    if not container:
-        raise SystemExit(
-            "refusing to register: TZ is empty in this container. Set TZ "
-            "in compose.yml's environment (e.g. America/Sao_Paulo) and "
-            "restart -- nothing else here fires without it, and the "
-            "schedules would otherwise fire in a zone nothing here can name."
-        )
+def load_owner_zone(config_path=CONFIG_FILE):
+    """owner.timezone, or refuse: every schedule here is written against it."""
     path = pathlib.Path(config_path)
     try:
         config = json.loads(path.read_text())
@@ -233,82 +201,28 @@ def load_zones(config_path=CONFIG_FILE, env=None):
         raise SystemExit(
             f"refusing to register: {path} has a blank owner.timezone."
         )
-    return owner, container
+    return owner
 
 
-def adopt_owner_clock(owner_tz, container_tz, config_path=CONFIG_FILE):
-    """Retire delivery.local_hour, left by setup when delivery.hour was stored
-    on the container's clock. With one zone that hour already is the owner's;
-    across two zones it is not recoverable without guessing through offsets.
+def adopt_owner_clock(owner_tz, legacy_tz, config_path=CONFIG_FILE):
+    """Retire delivery.local_hour, left by an older setup that stored
+    delivery.hour on the previous runtime's container clock (legacy_tz, that
+    install's TZ). With one zone that hour already is the owner's; across two
+    zones it is not recoverable without guessing through offsets.
     """
     path = pathlib.Path(config_path)
     config = json.loads(path.read_text())
     if "local_hour" not in config["delivery"]:
         return
-    if owner_tz != container_tz:
+    if owner_tz != legacy_tz:
         raise SystemExit(
             f"refusing to register: {path} predates owner-clock hours and its times "
-            f"are on the container's clock ({container_tz}), not the owner's "
+            f"are on the old container clock ({legacy_tz}), not the owner's "
             f"({owner_tz}). Ask the owner for their delivery time, extra hours and "
             "paper times again, write them as their own clock, remove "
             "delivery.local_hour, and re-run.")
     del config["delivery"]["local_hour"]
     _write_json(path, config)
-
-
-def _job_rows(jobs_path):
-    """hermes's persisted job rows; only a missing file means none."""
-    try:
-        return json.loads(pathlib.Path(jobs_path).read_text())["jobs"]
-    except FileNotFoundError:
-        return []
-
-
-def registered_jobs(jobs_path=JOBS_FILE):
-    """What is already scheduled, from hermes's own persisted state.
-
-    Reads the file `hermes cron` writes rather than parsing `hermes cron
-    list` -- a human rendering nothing pins. Returns {name: is_runnable};
-    a paused job is registered but will never fire, and the caller must
-    tell those apart (re-registering duplicates it, skipping it silently
-    strands it).
-
-    The invariant with teeth: never read "I could not tell what is
-    registered" as "nothing is". Only FileNotFoundError means empty -- an
-    unreadable or unexpected file raises and stops the run.
-    """
-    jobs = _job_rows(jobs_path)
-    return {
-        job["name"]: bool(job["enabled"]) and not job["paused_at"]
-        for job in jobs
-    }
-
-
-def resolve_deliver(deliver, env=None):
-    """Expand every ${VAR} in a delivery target from the container environment.
-
-    The chat uid is whichever chat the owner holds with this agent -- never
-    a literal in this repo. First boot publishes PLOW_HOME_CHANNEL; run this
-    from a turn, which inherits it from the gateway. Unset or blank REFUSES
-    loudly: an empty target is a chat leg that silently delivers nowhere.
-    """
-    import re
-
-    values = os.environ if env is None else env
-    source = "the container environment" if env is None else "the injected env"
-
-    def expand(match):
-        name = match.group(1)
-        value = (values.get(name) or "").strip()
-        if not value:
-            raise SystemExit(
-                f"refusing to register: deliver target {deliver!r} needs {name}, "
-                f"which is unset or blank in {source}. Registering without it "
-                "would create a chat leg that silently delivers nowhere."
-            )
-        return value
-
-    return re.sub(r"\$\{(\w+)\}", expand, deliver)
 
 
 def load_delivery_hour(config_path=CONFIG_FILE):
@@ -392,17 +306,10 @@ def _minutes(hhmm):
     return hour * 60 + minute
 
 
-def _slot(hour, lead_minutes, owner_tz, container_tz):
-    """(container HH:MM, lead) for one owner-clock hour.
-
-    Cron and --hold-until run on the container's clock. The lead is clamped
-    so the run never starts before midnight on either clock -- the run's
-    lock and paper are dated in the owner's zone.
-    """
-    h, m = _hour_minute(hour)
-    at = datetime.now(ZoneInfo(owner_tz)).replace(hour=h, minute=m, second=0, microsecond=0)
-    at = at.astimezone(ZoneInfo(container_tz)).strftime("%H:%M")
-    return at, min(lead_minutes, _minutes(hour), _minutes(at))
+def _lead(hour, lead_minutes):
+    """The lead for one owner-clock hour, clamped so the run never starts
+    before midnight -- the run's lock and paper are dated in the owner's zone."""
+    return min(lead_minutes, _minutes(hour))
 
 
 def daily_schedule(delivery_hour, lead_minutes):
@@ -422,14 +329,13 @@ def daily_schedule(delivery_hour, lead_minutes):
     return f"{total % 60} {total // 60} * * *"
 
 
-def daily_job(delivery_hour, lead_minutes, env=None, *, name=DAILY_NAME):
+def daily_job(delivery_hour, lead_minutes, owner_tz, *, name=DAILY_NAME):
     """One full-paper delivery job -- the canonical slot, or an extra one."""
     return {
         "name": name,
         "schedule": daily_schedule(delivery_hour, lead_minutes),
+        "tz": owner_tz,
         "prompt": paper_prompt(hold_until=delivery_hour, lead_minutes=lead_minutes),
-        "skill": "pt-research",
-        "deliver": DELIVER_TARGET,
     }
 
 
@@ -475,29 +381,24 @@ def require_workspace_spacing(hours):
                 )
 
 
-def paper_job(hour, at, lead_minutes, env=None):
-    """One focused paper: desks plus sections whose deliver_at is this hour.
-
-    `at` is that hour on the container's clock."""
-    name = paper_job_name(hour)
+def paper_job(hour, lead_minutes, owner_tz):
+    """One focused paper: desks plus sections whose deliver_at is this hour."""
     return {
-        "name": name,
-        "schedule": daily_schedule(at, lead_minutes),
-        "prompt": paper_prompt(hold_until=at, lead_minutes=lead_minutes, focus=hour),
-        "skill": "pt-research",
-        "deliver": DELIVER_TARGET,
+        "name": paper_job_name(hour),
+        "schedule": daily_schedule(hour, lead_minutes),
+        "tz": owner_tz,
+        "prompt": paper_prompt(hold_until=hour, lead_minutes=lead_minutes, focus=hour),
     }
 
 
-def subscription_job(topic, delivery_hour, env=None):
+def subscription_job(topic, delivery_hour, owner_tz):
     """The job spec for one subscription topic: nightly at the delivery hour."""
     hour, minute = _hour_minute(delivery_hour)
     return {
         "name": f"pt-subscription-{topic['id']}",
         "schedule": f"{minute} {hour} * * *",
+        "tz": owner_tz,
         "prompt": TOPIC_PROMPT.format(tid=topic["id"], depth="deep"),
-        "skill": "pt-research",
-        "deliver": DELIVER_TARGET,
     }
 
 
@@ -506,13 +407,12 @@ def oneoff_job(topic):
     return {
         "name": f"pt-oneoff-{topic['id']}",
         "schedule": topic["scheduled_for"],
+        "tz": None,
         "prompt": TOPIC_PROMPT.format(tid=topic["id"], depth=topic["depth"]),
-        "skill": "pt-research",
-        "deliver": DELIVER_TARGET,
     }
 
 
-def desired_jobs(topics, delivery_hour, owner_tz, container_tz, env=None,
+def desired_jobs(topics, delivery_hour, owner_tz,
                  lead_minutes=DEFAULT_LEAD_MINUTES, extra_hours=()):
     """The jobs the topic store calls for, in spec order.
 
@@ -522,27 +422,21 @@ def desired_jobs(topics, delivery_hour, owner_tz, container_tz, env=None,
     deliver_at that is not delivery.hour (a different newspaper), then one
     job per subscription, then one per pending one-off at its scheduled_for
     still ahead (topics.py refuses one without an offset; a past one is
-    not re-armed). Hours are the owner's and register on the container's
-    clock; lead_minutes is the nominal lead, clamped per slot (see _slot).
+    not re-armed). Hours are the owner's and register in the owner's zone;
+    lead_minutes is the nominal lead, clamped per slot (see _lead).
     """
     focused_hours = focused_paper_hours(topics, delivery_hour)
     require_workspace_spacing([delivery_hour, *extra_hours, *focused_hours])
     jobs = []
-
-    def slot(hour):
-        return _slot(hour, lead_minutes, owner_tz, container_tz)
-
     # The daily paper always exists once setup can register: weather and
     # calendar run even with zero news sections.
-    main_at, main_lead = slot(delivery_hour)
-    jobs.append(daily_job(main_at, main_lead, env))
+    jobs.append(daily_job(delivery_hour, _lead(delivery_hour, lead_minutes), owner_tz))
     for n, hour in enumerate(extra_hours, start=2):
-        jobs.append(daily_job(*slot(hour), env, name=f"{DAILY_NAME}-{n}"))
+        jobs.append(daily_job(hour, _lead(hour, lead_minutes), owner_tz, name=f"{DAILY_NAME}-{n}"))
     for hour in focused_hours:
-        at, lead = slot(hour)
-        jobs.append(paper_job(hour, at, lead, env))
+        jobs.append(paper_job(hour, _lead(hour, lead_minutes), owner_tz))
     jobs.extend(
-        subscription_job(t, main_at, env)
+        subscription_job(t, delivery_hour, owner_tz)
         for t in topics
         if t["kind"] == "subscription" and t["status"] != "cancelled"
     )
@@ -600,106 +494,79 @@ def stale_names(topics, registered, extra_hours_count=0, delivery_hour=None):
     return stale
 
 
-def _persisted_schedule_expr(job):
-    """The bare cron expression from a real job's persisted "schedule".
+def registered_jobs(listing):
+    """{name: job} for the pt-* jobs this spec manages, from a full listing.
 
-    Measured live against this fleet's own /var/lib/hermes/cron/jobs.json:
-    a real registered job's "schedule" is a dict, {"kind": "cron", "expr":
-    "15 2 * * *", "display": "15 2 * * *"} -- not the bare string this
-    module's own job specs use. Comparing the dict to the spec's string
-    directly (job_drift(), before this helper existed) made EVERY managed
-    job register as "drifted" on every single run, recreating it every
-    time register_crons.py ran -- caught live, not in the test suite, whose
-    fixtures had always used a bare string and so never exercised the real
-    shape.
+    A managed name registered twice is refused rather than guessed at --
+    editing or sweeping one of two copies leaves the other firing. The
+    on-demand copy (pt-daily-edition-now) is the exception: queue_now
+    replaces it by id.
     """
-    schedule = job.get("schedule")
-    if isinstance(schedule, dict):
-        return schedule.get("expr")
-    return schedule
+    registered = {}
+    for job in listing:
+        if not job.name.startswith("pt-") or job.name == NOW_NAME:
+            continue
+        if job.name in registered:
+            raise SystemExit(
+                f"refusing to register: {job.name} is registered twice "
+                f"({registered[job.name].id}, {job.id}). Remove one with "
+                f"`{' '.join(OPENCLAW)} cron rm <id>` and re-run.")
+        registered[job.name] = job
+    return registered
 
 
-def registered_specs(jobs_path=JOBS_FILE):
-    """The registered jobs' own fields, for drift detection.
-
-    registered_jobs() answers only "does it run"; this answers "does it match
-    the spec". Only fields hermes actually persisted are returned -- a
-    missing key means "unknown", and job_drift() leaves an unknown alone
-    rather than recreating on a guess (older rows, and the test fixtures,
-    carry no schedule).
-    """
-    jobs = _job_rows(jobs_path)
-    return {
-        job["name"]: {
-            "schedule": _persisted_schedule_expr(job),
-            "skill": job.get("skill"),
-            "prompt": job.get("prompt"),
-            "deliver": job.get("deliver"),
-        }
-        for job in jobs
-    }
+def _same_schedule(want, have, cron):
+    if cron:
+        return want == have
+    try:  # one-shots come back normalized to UTC; compare the instant
+        return datetime.fromisoformat(want).timestamp() == datetime.fromisoformat(
+            have.replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError, AttributeError):
+        return want == have
 
 
 def job_drift(job, spec):
-    """True when a registered job's persisted fields contradict the spec.
+    """True when a registered job's reported fields contradict the spec.
 
-    Only a field that is BOTH persisted and different is a drift; an absent
-    field is silence, not a mismatch. Schedule, skill and prompt are the
-    fields a spec change actually moves (the delivery hour, the lead, the
-    PDF-only vs transcript contract); deliver is not compared because its
-    resolved form depends on the turn's environment and a false drift would
-    edit every job on every run.
+    Only a field that is BOTH reported and different is a drift; an absent
+    field is silence, not a mismatch. Schedule, zone, prompt and model are
+    the fields a spec change actually moves (the delivery hour, the owner's
+    zone, the lead, the delivery contract, the model the paper is tuned on).
     """
-    for key in ("schedule", "skill", "prompt"):
-        stored = spec.get(key)
-        if stored is not None and stored != job[key]:
+    for key in ("schedule", "tz", "prompt", "model"):
+        have = spec.get(key)
+        want = job.get(key, MODEL) if key == "model" else job.get(key)
+        if have is None or want is None:
+            continue
+        if key == "schedule":
+            if not _same_schedule(want, have, cron=job.get("tz") is not None):
+                return True
+        elif have != want:
             return True
     return False
 
 
-def create_argv(job, env=None):
-    argv = [HERMES, "cron", "create", job["schedule"], job["prompt"],
-            "--name", job["name"], "--skill", job["skill"]]
-    if job["deliver"]:
-        argv += ["--deliver", resolve_deliver(job["deliver"], env)]
-    return argv
-
-
-def edit_argv(job, env=None):
-    """Update a registered job in place. `hermes cron edit` takes the name
-    (or id); never remove-then-create, or a failed create leaves no job."""
-    argv = [HERMES, "cron", "edit", job["name"],
-            "--schedule", job["schedule"],
-            "--prompt", job["prompt"],
-            "--skill", job["skill"]]
-    if job["deliver"]:
-        argv += ["--deliver", resolve_deliver(job["deliver"], env)]
-    return argv
-
-
-def queue_now(runner, jobs_path, lead_minutes, env=None, clock=None):
+def queue_now(backend, listing, lead_minutes, owner_tz, clock=None):
     """The on-demand copy: the main paper's own prompt as a one-shot job.
 
-    The gateway's scheduler fires it exactly like the morning run -- its own
-    session, the same workspace lock, the same --deliver -- so "send me the
-    paper now" can never be a thinner or different paper. Names are not
-    unique in hermes and a fired one-shot stays registered as completed, so
-    previous rows are removed by id -- only after the new one is created, so
-    a failed create never cancels a copy the owner was already promised.
+    The scheduler fires it exactly like the morning run -- its own session,
+    the same workspace lock, the same delivery leg -- so "send me the paper
+    now" can never be a thinner or different paper. Previous copies are
+    removed by id only after the new one is created, so a failed create
+    never cancels a copy the owner was already promised.
     """
-    at = (clock or datetime.now().astimezone()) + timedelta(minutes=1)
+    at = (clock or datetime.now(ZoneInfo(owner_tz))) + timedelta(minutes=1)
     job = {
         "name": NOW_NAME,
         "schedule": at.isoformat(timespec="seconds"),
+        "tz": None,
         "prompt": paper_prompt(lead_minutes=lead_minutes),
-        "skill": "pt-research",
-        "deliver": DELIVER_TARGET,
     }
-    previous = [j["id"] for j in _job_rows(jobs_path) if j["name"] == NOW_NAME]
-    _check(runner(create_argv(job, env)), f"could not queue {NOW_NAME}")
+    previous = [j.id for j in listing if j.name == NOW_NAME]
+    _check(backend.create(job), f"could not queue {NOW_NAME}")
     print(f"queued: {NOW_NAME} ({job['schedule']})")
     for job_id in previous:
-        _check(runner([HERMES, "cron", "remove", job_id]), f"could not remove the previous {NOW_NAME}")
+        _check(backend.remove(job_id), f"could not remove the previous {NOW_NAME}")
 
 
 def _check(proc, failure):
@@ -707,11 +574,7 @@ def _check(proc, failure):
         raise SystemExit(f"{failure}:\n{proc.stdout}\n{proc.stderr}")
 
 
-def _run(argv):
-    return subprocess.run(argv, capture_output=True, text=True)
-
-
-def main(argv=None, runner=_run, jobs_path=JOBS_FILE, config_path=CONFIG_FILE, env=None):
+def main(argv=None, backend=None, config_path=CONFIG_FILE, env=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     # parse_args(None) on the CLI is sys.argv[1:], but in-process callers
     # pass [] so argparse never reads the test runner's argv.
@@ -721,68 +584,72 @@ def main(argv=None, runner=_run, jobs_path=JOBS_FILE, config_path=CONFIG_FILE, e
              "out -- the on-demand copy, same prompt, no send clock",
     )
     args = parser.parse_args(argv if argv is not None else [])
+    env = os.environ if env is None else env
 
-    if not shutil.which(HERMES) and not os.path.exists(HERMES):
-        raise SystemExit(f"{HERMES} not found -- run this inside the agent container")
+    if backend is None:
+        if not os.path.exists(OPENCLAW[1]):
+            raise SystemExit(f"{OPENCLAW[1]} not found -- run this inside the agent container")
+        backend = CronBackend()
 
-    owner_tz, container_tz = load_zones(config_path, env)
+    owner_tz = load_owner_zone(config_path)
     # The topic store, via pt-intake's single reader -- so a broken
     # topics.json refuses here too, rather than reading as "no topics" and
     # pruning every subscription job this run could have kept.
     import topics as topics_mod
     topics = topics_mod.load_topics()
-    adopt_owner_clock(owner_tz, container_tz, config_path)
+    adopt_owner_clock(owner_tz, (env.get("TZ") or "").strip() or owner_tz, config_path)
     delivery_hour = load_delivery_hour(config_path)
     extra_hours = load_extra_hours(config_path)
     lead_minutes = load_lead_minutes(config_path)
 
-    registered = registered_jobs(jobs_path)
-    specs = registered_specs(jobs_path)
+    listing = backend.list()
+    registered = registered_jobs(listing)
     paused = []
     pending = []
 
-    for job in desired_jobs(topics, delivery_hour, owner_tz, container_tz, env,
-                            lead_minutes, extra_hours):
-        if job["name"] in registered:
-            if not registered[job["name"]]:
+    for job in desired_jobs(topics, delivery_hour, owner_tz, lead_minutes, extra_hours):
+        current = registered.get(job["name"])
+        if current is not None:
+            if not current.enabled:
                 print(
-                    f"WARNING: {job['name']} is registered but PAUSED -- it will "
+                    f"WARNING: {job['name']} is registered but DISABLED -- it will "
                     "never fire, and this leaves it alone rather than "
-                    f"duplicating it. Resume it: {HERMES} cron resume {job['name']}"
+                    f"duplicating it. Enable it: {' '.join(OPENCLAW)} cron enable {current.id}"
                 )
                 paused.append(job["name"])
                 continue
-            spec = specs.get(job["name"], {})
-            if not job_drift(job, spec):
+            if not job_drift(job, current.spec):
                 print(f"already present, skipped: {job['name']}")
                 continue
-            pending.append(("edit", job, spec, edit_argv(job, env)))
+            pending.append(("edit", job, current))
         else:
-            pending.append(("create", job, None, create_argv(job, env)))
+            pending.append(("create", job, None))
 
-    for action, job, spec, argv in pending:
+    for action, job, current in pending:
         if action == "edit":
             print(
                 f"updating drifted job: {job['name']} "
-                f"(was {spec.get('schedule')!r}, now {job['schedule']!r})"
+                f"(was {current.spec.get('schedule')!r} {current.spec.get('tz')!r}, "
+                f"now {job['schedule']!r} {job['tz']!r})"
             )
-        _check(runner(argv), f"could not {'update drifted job' if action == 'edit' else 'register'} "
-                             f"{job['name']}")
-        verb = "updated" if action == "edit" else "registered"
-        print(f"{verb}: {job['name']} ({job['schedule']})")
+            _check(backend.edit(current.id, job), f"could not update drifted job {job['name']}")
+            print(f"updated: {job['name']} ({job['schedule']})")
+        else:
+            _check(backend.create(job), f"could not register {job['name']}")
+            print(f"registered: {job['name']} ({job['schedule']})")
 
     for name in stale_names(topics, registered, len(extra_hours), delivery_hour):
-        _check(runner([HERMES, "cron", "remove", name]), f"could not remove stale job {name}")
+        _check(backend.remove(registered[name].id), f"could not remove stale job {name}")
         print(f"removed stale job: {name}")
 
     if args.now:
-        queue_now(runner, jobs_path, lead_minutes, env)
+        queue_now(backend, listing, lead_minutes, owner_tz)
 
     if paused:
         raise SystemExit(
             f"registered what was missing, but {len(paused)} job(s) are "
-            f"PAUSED and will never fire: {', '.join(paused)} -- "
-            f"{HERMES} cron resume <name>"
+            f"DISABLED and will never fire: {', '.join(paused)} -- "
+            f"{' '.join(OPENCLAW)} cron enable <id>"
         )
     return 0
 

@@ -370,7 +370,7 @@ Do not write `pt/config.json` until `NEXT_QUESTION` says `close`:
        /opt/plow/skills/pt-setup/scripts/finalize_setup.py /var/lib/plow/pt/config.json --owner-tz <IANA zone from step 1>
 
    It reads the draft, stores the hour as the owner named it (in their
-   own zone; `register_crons.py` moves it onto the container's clock),
+   own zone; the scheduler fires every job in that zone),
    validates against the gate **before** anything lands, and prints
    `CONFIG:written` plus the delivery line. On failure it prints why and
    writes nothing: an unfinished interview, an unknown zone, or a gate

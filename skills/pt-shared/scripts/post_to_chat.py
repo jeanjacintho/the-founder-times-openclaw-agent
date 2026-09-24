@@ -89,12 +89,13 @@ HOLD_UNTIL_RE = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 
 def _hold_zone():
-    name = os.environ.get("TZ") or "UTC"
-    return ZoneInfo(name)
+    """The owner's zone: the scheduler fires jobs on owner.timezone (--tz), so
+    the send clock is the same wall clock, never the container's TZ."""
+    return owner_now().tzinfo
 
 
 def seconds_until_hhmm(hhmm, now=None):
-    """Seconds from now until today's HH:MM in TZ; 0 if that clock has passed.
+    """Seconds from now until today's HH:MM on the owner's clock; 0 if passed.
 
     Never wraps to tomorrow: a late paper posts immediately rather than
     sitting until the next day's hour.

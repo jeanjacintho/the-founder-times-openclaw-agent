@@ -87,7 +87,8 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
   in `pt/config.json`. Falls back to the container's clock only when the
   config or the key is absent; a config that exists but can't be trusted (bad
   JSON, an unreadable file, an unknown zone name) raises. Shared by
-  `history.py`'s window and `record_edition.py`'s heading below.
+  `history.py`'s window, `record_edition.py`'s heading and
+  `post_to_chat.py --hold-until`.
 - `pt-priority/scripts/history.py recent [--topic ID]` — what this paper printed on the last 7
   days, read from the wiki's edition pages: bare, the advisor desk's cards, `[{"date", "desk"}]`;
   with a news section's topic id, that section's own blocks,
