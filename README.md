@@ -24,6 +24,16 @@ first; the install guide is written once parity is reached.
 
 The Agent Index reporter from the base is kept as is (`AGENT_ID=theplowtimes`).
 
+## Development
+
+Tests need no Plow credentials and no network beyond fetching pinned tools.
+
+```sh
+npm ci
+npm run test:py   # newspaper scripts: pytest on Python 3.13 via uv
+npm test          # the above, then the base's tsc, node tests and offline probe in the image
+```
+
 ## License
 
 MIT. See `LICENSE` and `NOTICE`.
