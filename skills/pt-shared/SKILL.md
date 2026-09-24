@@ -121,6 +121,10 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
 - `scripts/set_signal_source.py <group_chat|email|imessage> <on|off>` — the
   ONLY way a finished config's signal switches change; gate-checked, atomic,
   prints `SIGNALS:group_chat=…,email=…,imessage=…`. Called bare.
+- `scripts/chat_message_id.py` — the item for the owner's own Plow chat message:
+  bare, `HANDLE:plow_chat:<chat>:<message>` for their latest message or
+  `HANDLE:none` (fails closed, never a guess); `read <handle>` re-opens it as
+  JSON or prints `NOT_FOUND`. Same `GET /v1/chats/<uid>/messages` the channel reads.
 - `scripts/owner_phrases.py template | record | status` — the paper's fixed
   lines (setup wait lines, print-miss line, failed-turn notice, page labels) in
   the owner's language: curated English and Portuguese, and for any other
