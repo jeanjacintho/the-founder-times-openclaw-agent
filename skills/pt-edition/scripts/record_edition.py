@@ -28,6 +28,13 @@ validate` and `wiki index`, so the paper's page lists the day.
 The renderer already refused a malformed edition.json before delivery, so the
 fields it requires are read directly.
 
+Every string that came from research is untrusted, and Obsidian renders the
+page's Markdown and HTML on the owner's Mac: an image link is fetched on open,
+a forged heading or list item reads as the paper's own. So each one is written
+through `_md()` (inline syntax, and line starts, made inert) and each link
+through `_url()` (http(s) only) -- the same once-in-code escaping
+render_edition.py does for the printed page.
+
 Prints `RECORDED <page>` or `SKIPPED: <why>`. A failure exits non-zero with
 `error: edition not recorded — <why>`; the delivery it follows still stands.
 """
@@ -38,7 +45,9 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 import sys
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -55,24 +64,69 @@ from render_edition import fill_news_desk  # noqa: E402 -- sibling script beside
 
 MARK = "<!-- edition {} -->"
 
+# Inline characters that open Markdown, HTML or Obsidian syntax (image, link,
+# embed, code, emphasis), escaped wherever they appear. Angle brackets become
+# entities, so no renderer can read a tag.
+_INLINE = re.compile(r"([\\`*_\[\]!])")
+# Obsidian's paired markers: %%comment%%, ==highlight==, ~~strike~~.
+_PAIRS = re.compile(r"(%%|==|~~)")
+# What a line may start with to become a heading, list, quote or table.
+_LINE_START = re.compile(r"^(\s*)([#+\-*>|]|\d+[.)])")
+
+
+def _md(text, block=False):
+    """Research text as inert Markdown. A single-line field folds its newlines."""
+    text = str(text if text is not None else "")
+    if not block:
+        text = " ".join(text.split())
+    text = _INLINE.sub(r"\\\1", text)
+    text = text.replace("<", "&lt;").replace(">", "&gt;")
+    text = _PAIRS.sub(lambda m: m.group(0)[0] + "\\" + m.group(0)[1], text)
+    return "\n".join(_LINE_START.sub(_inert_start, line) for line in text.split("\n"))
+
+
+def _inert_start(match):
+    """`# x` -> `\\# x`; `1. x` -> `1\\. x` (a backslash only escapes punctuation)."""
+    indent, marker = match.group(1), match.group(2)
+    if marker[0].isdigit():
+        return indent + marker[:-1] + "\\" + marker[-1]
+    return indent + "\\" + marker
+
+
+def _url(url):
+    """An http(s) link with nothing in it Markdown could read as syntax, else None."""
+    url = str(url or "").strip()
+    try:
+        scheme = urllib.parse.urlsplit(url).scheme.lower()
+    except ValueError:
+        return None
+    if scheme not in ("http", "https"):
+        return None
+    return urllib.parse.quote(url, safe=":/?#@&=+;,%~-._!$'*")
+
+
+def _link(url):
+    return _url(url) or "unlinked source"
+
 
 def _card(card):
-    lines = ["### The advisor's desk", "", f"**{card['headline']}**", ""]
+    lines = ["### The advisor's desk", "", f"**{_md(card['headline'])}**", ""]
     for rank, recommendation in enumerate(card["recommendations"], 1):
-        lines += [f"### {rank}. {recommendation['headline']}", "", recommendation["body"], "",
-                  f"- First step: {recommendation['first_step']}"]
+        lines += [f"### {rank}. {_md(recommendation['headline'])}", "", _md(recommendation["body"], block=True), "",
+                  f"- First step: {_md(recommendation['first_step'])}"]
         for evidence in recommendation["evidence"]:
-            lines.append(f"- Evidence: {evidence['claim']} ({evidence['source']})")
+            lines.append(f"- Evidence: {_md(evidence['claim'])} ({_md(evidence['source'])})")
         advisor = recommendation["advisor"]
-        lines += [f'- Advisor: "{advisor["quote"]}" — {advisor["name"]} ({advisor["url"]})', ""]
-    lines += [f"- Question: {question}" for question in card.get("questions") or []]
+        lines += [f'- Advisor: "{_md(advisor["quote"])}" — {_md(advisor["name"])} ({_link(advisor["url"])})', ""]
+    lines += [f"- Question: {_md(question)}" for question in card.get("questions") or []]
     return lines + [""]
 
 
 def _card_urls(card):
     for recommendation in card["recommendations"]:
-        if (recommendation.get("advisor") or {}).get("url"):
-            yield recommendation["advisor"]["url"]
+        url = _url((recommendation.get("advisor") or {}).get("url"))
+        if url:
+            yield url
 
 
 def _archive_card(card, headline):
@@ -86,12 +140,12 @@ def _archive_card(card, headline):
 
 
 def _section(section, notes):
-    lines = [f"### {section['title']}", ""]
+    lines = [f"### {_md(section['title'])}", ""]
     if section.get("headline"):
-        lines += [f"**{section['headline']}**", ""]
-    lines += [section["body"], ""]
-    lines += [f"- {note['claim']} ({note['url']})" for note in notes.get("notes") or []]
-    lines += [f"- Could not source: {gap}" for gap in notes.get("could_not_source") or []]
+        lines += [f"**{_md(section['headline'])}**", ""]
+    lines += [_md(section["body"], block=True), ""]
+    lines += [f"- {_md(note['claim'])} ({_link(note['url'])})" for note in notes.get("notes") or []]
+    lines += [f"- Could not source: {_md(gap)}" for gap in notes.get("could_not_source") or []]
     return lines + [""]
 
 
@@ -180,13 +234,13 @@ def record(wiki, edition_json, chat, now):
                 path = run_dir.parent / section["topic_id"] / "notes.json"
                 notes = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
                 lines += _section(section, notes)
-                urls += [note["url"] for note in notes.get("notes") or []]
-                urls += [u for u in section.get("sources") or [] if u.startswith("http")]
+                urls += [_url(note["url"]) for note in notes.get("notes") or []]
+                urls += [_url(u) for u in section.get("sources") or []]
                 sections_meta[section["topic_id"]] = _section_record(
                     section, notes, sections_meta.get(section["topic_id"], {}))
 
             cited = {s["resource"] for s in meta["sources"]}
-            meta["sources"] += [{"resource": u} for u in dict.fromkeys(urls) if u not in cited]
+            meta["sources"] += [{"resource": u} for u in dict.fromkeys(urls) if u and u not in cited]
             meta["sources"] = meta["sources"] or [{"resource": f"plow-chat:{chat}"}]
             if card and _is_latest_edition(meta.get("priority_at"), now):
                 meta["description"] = card["recommendations"][0]["headline"]
