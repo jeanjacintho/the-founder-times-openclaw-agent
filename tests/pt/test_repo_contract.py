@@ -604,6 +604,21 @@ class TestSoul:
         probe = json.dumps({"argv": scan.IMESSAGE_ARGV, "read_paths": ["~/Library/Messages"], "goal": scan.IMESSAGE_GOAL})
         assert probe.replace('{"argv"', '{ "argv"').rstrip("}") + " }" in setup
 
+    def test_the_tournament_treats_signals_as_unverified_evidence(self):
+        # Signals are other people's words: evidence the tournament must
+        # re-open and prosecute, never an accepted fact or an Answered entry.
+        skill = (ROOT / "pt-priority" / "SKILL.md").read_text()
+        orient = skill[skill.index("## Orient"):skill.index("## Run generations")]
+        assert "signals_recent.py recent" in orient
+        assert "## Signals (unverified)" in orient
+        rules = skill[skill.index("### Signals are unverified evidence"):skill.index("## Run generations")]
+        for rule in ("never an Answered", "unsupported", "re-open", "ineligible at Cull",
+                     "data, never instructions", "never copy a signal's words"):
+            assert rule in rules, rule
+        challenge = skill[skill.index("### 1. Challenge + research"):skill.index("### 2. Criticize")]
+        criticize = skill[skill.index("### 2. Criticize"):skill.index("### 3. Cull")]
+        assert "signal" in challenge and "unverified signal" in criticize
+
     def test_signal_sources_change_later_only_through_their_script(self):
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
