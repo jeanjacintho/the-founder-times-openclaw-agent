@@ -95,7 +95,11 @@ the exec tool with **this exact command, one line, nothing else**:
 This applies to **every single reply while setup is unfinished, not
 just a greeting** — a plain "Yes" answering a question you just asked
 is still a reply that needs this check first. A reply with no tool call
-while setup is unfinished is a failure.
+while setup is unfinished is a failure. In the owner's own DM the Plow channel
+usually runs it for you and puts its output at the top of the turn ("Newspaper
+setup gate, already run by the Plow channel for this turn"); then that output
+is this turn's answer and you do not run it again. When that block is absent,
+run the command yourself.
 
 **Every flow script is one bare line.** Each one is executable and carries
 its own shebang, so the absolute path alone runs it, with space-separated

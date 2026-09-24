@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Print SETUP_NEEDED or READY for the live-chat first-run gate.
 
-SOUL.md tells the model to run this on every owner DM before greeting.
+The Plow channel runs this before every owner DM turn and hands the
+output to the model; AGENTS.md tells the model to run it itself when that
+block is missing.
 A missing file, unreadable JSON, or any of the three setup keys absent
 is SETUP_NEEDED — load pt-setup, do not introduce a general assistant.
 READY means the interview already finished; greetings are ordinary turns.
