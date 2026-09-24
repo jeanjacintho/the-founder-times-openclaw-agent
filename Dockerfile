@@ -124,6 +124,10 @@ RUN case "${TARGETARCH:-amd64}" in \
  && chmod 0755 /usr/local/bin/agentsview
 RUN cd /opt/plow && npm ci --omit=dev --omit=peer --omit=optional --ignore-scripts && node /opt/plow/build.ts && chmod +x /opt/plow/probe
 ENV OPENCLAW_STATE_DIR=/var/lib/plow OPENCLAW_CONFIG_PATH=/var/lib/plow/openclaw.json OPENCLAW_NO_RESPAWN=1 NODE_DISABLE_COMPILE_CACHE=1
+# Agent Index listing. Compose (and a host that injects env) can override without rebuild.
+ENV AGENT_ID=theplowtimes \
+    AGENT_NAME="The Founder Times" \
+    AGENT_BLURB="Your morning paper, printed. It researches on your Mac and puts a sourced page in the tray, or a PDF in chat."
 # The inherited healthcheck loads config and can race the boot state lock.
 HEALTHCHECK NONE
 USER node
