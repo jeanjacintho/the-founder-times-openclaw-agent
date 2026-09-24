@@ -33,7 +33,7 @@ The next daily run, not live intake, re-ranks Q&A by how much an answer changes 
 - Every factual claim names its item in the private advisor page or Q&A. Missing access is
   **unknown, never disproved**. Never turn an error into “none found.” An **item** is a handle:
   a named reader plus the id it re-opens with — a mail message or thread id, a calendar event id,
-  a Messages chat plus rowid, a sheet id and tab, a file path that opens. A source class with no
+  a Messages chat plus rowid, the owner's own Plow chat message as `plow_chat:<chat uid>:<message uid>` (bare `/opt/plow/skills/pt-shared/scripts/chat_message_id.py` prints the latest one as `HANDLE:…`; `chat_message_id.py read <handle>` re-opens it), a sheet id and tab, a file path that opens. A source class with no
   handle (“a mail thread and a calendar event”) is not an item. A claim whose item will not
   re-open is **unsupported**: not disproved, and not a fact this page may rest on.
 - Everything this desk writes -- headline, body, first step, questions -- is in the owner's

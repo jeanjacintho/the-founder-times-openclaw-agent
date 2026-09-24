@@ -99,11 +99,11 @@ is not a topic. Run `/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk` fi
 isn't reachable: say so in one line and write nothing, the correction will need resending.
 Then `plow__plow_read_file` `~/Plow/wiki/entities/owner/goals.md`, append one line
 dated today (`- YYYY-MM-DD: …`, an answer starting with its `Q<n>`) ending with its item, the
-same shape the Q&A uses: a Messages chat plus rowid, or a named mail reader's message id, of the owner's own
-message that carried the correction — a correction made in chat **is** a re-openable item only when
-that message carries a handle (the item pt-priority/SKILL.md defines), so the line pins it rather
-than restating it; where it does not (issue #85's non-phone-backed line), say so in one line and
-write nothing — an unsupported correction is not one the line may pin. File it under `## Goals`, `## Not now` or `## Notes`,
+same shape the Q&A uses: a Messages chat plus rowid, a named mail reader's message id, or
+the owner's own Plow chat message as `plow_chat:<chat uid>:<message uid>` (bare `/opt/plow/skills/pt-shared/scripts/chat_message_id.py` prints the latest one as `HANDLE:…`; `chat_message_id.py read <handle>` re-opens it), of the owner's own message that carried the correction — so the line pins it rather
+than restating it. With no Messages or mail counterpart, run `chat_message_id.py`; only when it
+prints `HANDLE:none` is there no item: say so in one line and write nothing — an unsupported
+correction is not one the line may pin. File it under `## Goals`, `## Not now` or `## Notes`,
 whichever fits, set `updated:` to today. Read it again immediately before the write and fold
 whatever changed since the first read into what you write — the owner edits this page in
 Obsidian, and their line is evidence of what they say, never something a pass drops. Then

@@ -264,9 +264,10 @@ Stop. On their next message:
      `~/Plow/wiki` ready (creating it when the Mac has none) and prints `WIKI:…`.
   2. `plow__plow_read_file` `path=~/Plow/wiki/entities/owner/goals.md`; add
      their answer as one `- ` line under `## Goals` unless it is already there, ending
-     with its item — the shape intake's corrections use: a Messages chat plus rowid, or
-     a named mail reader's message id, of the owner's own message; every setup answer
-     arrives as one, so this is never optional. Set `updated:` to today. Read it again
+     with its item — the shape intake's corrections use: a Messages chat plus rowid, a
+     named mail reader's message id, or the `plow_chat:…` handle bare
+     `/opt/plow/skills/pt-shared/scripts/chat_message_id.py` prints for the owner's own
+     message; every setup answer arrives as one, so this is never optional. Set `updated:` to today. Read it again
      immediately before the write and fold whatever
      changed since the first read into what you write — the owner edits this page in
      Obsidian, and their line is evidence of what they say, never something a pass

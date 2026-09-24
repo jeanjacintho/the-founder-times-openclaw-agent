@@ -678,6 +678,17 @@ class TestSoul:
         assert "in the owner's language" in check and "on-demand run states no window" in check
         assert "too little tournament window" in skill
 
+    def test_an_owner_chat_message_is_a_reopenable_item(self):
+        # An owner correction texted to the agent's line had no documented
+        # handle, so it could never be a fact the advisor page rests on.
+        priority = (ROOT / "pt-priority" / "SKILL.md").read_text()
+        intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
+        setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
+        definition = priority[priority.index("An **item** is a handle"):priority.index("is **unsupported**")]
+        assert "plow_chat:<chat uid>:<message uid>" in definition and "chat_message_id.py read" in definition
+        assert "chat_message_id.py" in intake and "HANDLE:none" in intake
+        assert "chat_message_id.py" in setup
+
     def test_signal_sources_change_later_only_through_their_script(self):
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
