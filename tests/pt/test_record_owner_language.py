@@ -64,3 +64,20 @@ def test_usage_without_args(capsys):
     rc = rec.main(["record_owner_language.py"])
     assert rc == 1
     assert "usage" in capsys.readouterr().err
+
+
+def test_a_language_with_no_phrases_asks_for_them(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("PT_HOME", str(tmp_path))
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps(READY), encoding="utf-8")
+    assert rec.main(["record_owner_language.py", str(config), "Mandarin Chinese"]) == 0
+    assert capsys.readouterr().out.strip().splitlines() == ["LANG:Mandarin Chinese", "PHRASES:missing"]
+
+
+def test_curated_languages_never_ask_for_phrases(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("PT_HOME", str(tmp_path))
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps(READY), encoding="utf-8")
+    for language in ("English", "Português", "pt-BR"):
+        rec.main(["record_owner_language.py", str(config), language])
+        assert capsys.readouterr().out.strip() == f"LANG:{language}"

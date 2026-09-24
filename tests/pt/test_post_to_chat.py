@@ -324,3 +324,31 @@ class TestHoldUntil:
     def test_bad_clock_is_refused(self):
         with pytest.raises(SystemExit, match="hold-until"):
             post.seconds_until_hhmm("7:00")
+
+
+class TestPrintMissInTheOwnersLanguage:
+    """owner.language is free-form: a language with no curated lines speaks
+    through the phrases the paper wrote for it, and English until it has."""
+
+    ZH = {"print.lede": "页面未打印 — ", "print.retry": "；下一次定时运行会重试",
+          "print.timeout": "结果未知：{seconds}秒后仍在运行", "print.no_pdf": "{path} 没有可打印的 PDF"}
+
+    def _write_phrases(self, tmp_path, language):
+        phrases = load_module("owner_phrases", "pt-shared/scripts/owner_phrases.py")
+        table = {**{k: "ZH " + v for k, v in phrases.SOURCE.items()}, **self.ZH}
+        home = tmp_path / "pt"
+        home.mkdir(exist_ok=True)
+        (home / "owner-phrases.json").write_text(json.dumps({"language": language, "phrases": table}, ensure_ascii=False))
+
+    def _miss(self, tmp_path, monkeypatch):
+        (tmp_path / "edition.pdf").write_bytes(b"%PDF")
+        return TestMissedPrintIsReported()._main(tmp_path, monkeypatch, ["--pdf", "edition.pdf"],
+                                                 _exits(1, "error: lp 1: no such printer"), language="Mandarin Chinese")
+
+    def test_a_written_language_gets_its_own_line(self, tmp_path, monkeypatch):
+        self._write_phrases(tmp_path, "Mandarin Chinese")
+        assert self._miss(tmp_path, monkeypatch) == ["页面未打印 — lp 1: no such printer；下一次定时运行会重试"]
+
+    def test_phrases_for_another_language_are_never_used(self, tmp_path, monkeypatch):
+        self._write_phrases(tmp_path, "Deutsch")
+        assert self._miss(tmp_path, monkeypatch) == ["page not printed — lp 1: no such printer; next scheduled run retries"]

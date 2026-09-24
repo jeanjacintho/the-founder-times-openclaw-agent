@@ -18,7 +18,8 @@ Skip the call only when the message is a lone acknowledgement
 
 While setup is unfinished it writes `.setup-draft.json` (same sibling
 as record_setup.py). After READY it writes `pt/config.json`. Prints
-LANG:<language> on success.
+LANG:<language> on success, then PHRASES:missing when that language has no
+fixed phrases yet (owner_phrases.py: write them before answering).
 
 Exit 0 on success. Missing args or a blank language: stderr, exit 1.
 """
@@ -33,6 +34,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import setup_needed as _gate  # noqa: E402
 from pt_paths import config_file  # noqa: E402
+from owner_phrases import status as phrases_status  # noqa: E402
 
 DEFAULT_CONFIG = str(config_file())
 
@@ -90,6 +92,10 @@ def main(argv=None):
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(line)
+    # A language with no curated lines needs the paper's fixed phrases written
+    # once, in it (owner_phrases.py); English and Portuguese never do.
+    if phrases_status(argv[2].strip()) == "missing":
+        print("PHRASES:missing")
     return 0
 
 

@@ -539,7 +539,9 @@ class TestSoul:
         # spoken line — no paths, no desk names.
         soul = (AGENTS).read_text()
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
-        status = (ROOT / "pt-shared" / "scripts" / "chat_status.py").read_text()
+        # The wait lines moved with every other fixed line into owner_phrases.py.
+        status = ((ROOT / "pt-shared" / "scripts" / "chat_status.py").read_text()
+                  + (ROOT / "pt-shared" / "scripts" / "owner_phrases.py").read_text())
         assert "CHAT_VOICE" in soul
         assert "emoji, then a space, then one or two short spoken lines" in soul
         for mark in ("📰", "🕖", "🖨️", "⭐", "✉️", "🗞️", "⏳"):
@@ -631,6 +633,37 @@ class TestSoul:
         assert "fresh angle" in rule and "repeat is possible" in rule
         assert "owner's language" in rule
         assert "budget" in rule
+
+    def test_fixed_lines_follow_any_owner_language(self):
+        # owner.language is free-form; English and Portuguese are curated, and
+        # every other language gets the fixed lines written once by the model.
+        soul = (AGENTS).read_text()
+        edition = (ROOT / "pt-edition" / "SKILL.md").read_text()
+        assert "PHRASES:missing" in soul and "owner_phrases.py record" in soul
+        render = edition[edition.index("## Render and deliver"):edition.index("1. Run the renderer")]
+        assert "owner_phrases.py status" in render and "owner_phrases.py record" in render
+        for script in ("chat_status.py", "post_to_chat.py"):
+            text = (ROOT / "pt-shared" / "scripts" / script).read_text()
+            assert "owner_phrases import phrase" in text and "is_portuguese" not in text, script
+
+    def test_the_channels_failed_turn_notice_matches_the_scripts(self):
+        # The channel cannot import Python: its curated notice must be the
+        # same words owner_phrases.py holds, so one language speaks one way.
+        phrases = load_module("owner_phrases", "pt-shared/scripts/owner_phrases.py")
+        plugin = (REPO / "plugin" / "owner-phrases.ts").read_text()
+        assert json.dumps(phrases.SOURCE["turn.failed"], ensure_ascii=False) in plugin
+        assert json.dumps(phrases.PORTUGUESE["turn.failed"], ensure_ascii=False) in plugin
+        assert "owner-phrases.json" in plugin and '"turn.failed"' in plugin
+
+    def test_a_halted_tool_loop_speaks_in_the_papers_voice(self):
+        # A halted loop once answered the owner with the guardrail's own text
+        # (tool name, guardrail id, attempt count, advice to itself).
+        soul = (AGENTS).read_text()
+        assert "| A tool kept failing; couldn't finish this | 🛑 |" in soul
+        rule = soul[soul.index("**A tool that keeps failing never speaks for you.**"):]
+        rule = rule[:rule.index("**Every chat turn is silent")]
+        for banned in ("tool name", "guardrail", "attempt count", "advice written to yourself"):
+            assert banned in rule, banned
 
     def test_signal_sources_change_later_only_through_their_script(self):
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()

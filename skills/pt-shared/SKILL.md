@@ -119,6 +119,12 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
 - `scripts/set_signal_source.py <group_chat|email|imessage> <on|off>` — the
   ONLY way a finished config's signal switches change; gate-checked, atomic,
   prints `SIGNALS:group_chat=…,email=…,imessage=…`. Called bare.
+- `scripts/owner_phrases.py template | record | status` — the paper's fixed
+  lines (setup wait lines, print-miss line, failed-turn notice, page labels) in
+  the owner's language: curated English and Portuguese, and for any other
+  language the translation the model records once (stdin JSON, every key, every
+  `{placeholder}` kept). `status` prints `PHRASES:ready|missing`. The library
+  call `phrase(key, language, **fields)` is what scripts use.
 - `references/signal-triage.md` — the one priority / fyi / spam rubric for group
   chats, mail and iMessage; the channel puts it in front of every group turn.
 - `references/config.example.json` — the config contract `pt_config_gate.py`
