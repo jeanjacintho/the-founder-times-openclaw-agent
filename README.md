@@ -24,6 +24,29 @@ first; the install guide is written once parity is reached.
 
 The Agent Index reporter from the base is kept as is (`AGENT_ID=theplowtimes`).
 
+## Moving a paper from the Hermes edition
+
+The owner's wiki lives on their Mac and does not move. The paper's own
+choices — `pt/config.json` and `pt/topics.json` in the old `agent-home`
+volume — can be brought over instead of answering setup again:
+
+```sh
+# From the Hermes checkout, with its agent still defined:
+docker compose cp agent:/var/lib/hermes/pt ./hermes-pt
+
+# From this checkout, with this agent running:
+docker compose cp ./hermes-pt agent:/tmp/hermes-pt
+docker compose exec -u root agent chown -R node:node /tmp/hermes-pt
+docker compose exec agent /opt/plow/skills/pt-setup/scripts/import_state.py \
+  --from /tmp/hermes-pt --previous-tz America/Sao_Paulo
+```
+
+`--previous-tz` is the `TZ` the old compose ran with (`PT_TZ`, default
+`America/Sao_Paulo`). The script refuses a config that fails the setup gate,
+a topic store of the wrong shape, or an install that already has a paper
+(`--replace` overwrites on purpose), then registers the jobs. Scratch, locks
+and the old scheduler's jobs stay behind.
+
 ## Development
 
 Tests need no Plow credentials and no network beyond fetching pinned tools.
