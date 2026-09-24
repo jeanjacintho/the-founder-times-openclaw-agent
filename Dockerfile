@@ -127,7 +127,8 @@ ENV OPENCLAW_STATE_DIR=/var/lib/plow OPENCLAW_CONFIG_PATH=/var/lib/plow/openclaw
 # Agent Index listing. Compose (and a host that injects env) can override without rebuild.
 ENV AGENT_ID=thefoundertimes \
     AGENT_NAME="The Founder Times" \
-    AGENT_BLURB="Your morning paper, printed. It researches on your Mac and puts a sourced page in the tray, or a PDF in chat."
+    AGENT_BLURB="Your morning paper, printed. It researches on your Mac and puts a sourced page in the tray, or a PDF in chat." \
+    AGENT_RUNTIME="OpenClaw 2.0"
 # The inherited healthcheck loads config and can race the boot state lock.
 HEALTHCHECK NONE
 USER node

@@ -76,7 +76,7 @@ export function startAgentIndex(interval = 300_000) {
       // Sent only when set. The Index leaves a field it is not given alone, so
       // an empty name would not clear the name, and one passed every pass would
       // overwrite an edit the owner made on their page.
-      for (const [flag, value] of [["--name", process.env.AGENT_NAME], ["--blurb", process.env.AGENT_BLURB]] as const) if (value) register.push(flag, value);
+      for (const [flag, value] of [["--name", process.env.AGENT_NAME], ["--blurb", process.env.AGENT_BLURB], ["--runtime", process.env.AGENT_RUNTIME]] as const) if (value) register.push(flag, value);
       if (await run(register, process.env.PLOW_AGENT_TOKEN)) return console.error("agent-index: no index key this pass, not reporting");
     }
     if (await run(["--agent", agent])) console.error("agent-index: reporter exited non-zero, see the line above");
