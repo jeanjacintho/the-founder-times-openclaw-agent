@@ -44,7 +44,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 sys.path.insert(
     0, str(pathlib.Path(__file__).resolve().parents[2] / "pt-shared" / "scripts")
 )
-from owner_language import is_portuguese  # noqa: E402
+from owner_phrases import phrase  # noqa: E402
 from pt_paths import config_file  # noqa: E402
 DEFAULT_MASTHEAD = "THE FOUNDER TIMES"
 KINDS = ("section", "assignment")
@@ -524,6 +524,21 @@ def fill_news_desk(edition):
             section["desk"] = "news"
 
 
+def _label(key, language):
+    """The page's own vocabulary (Sources:, FIRST STEP, …) in the owner's
+    language: owner_phrases.py's page.* lines, curated English and Portuguese or
+    the phrases the paper wrote for any other language. The renderer never
+    translates."""
+    return phrase(f"page.{key}", language)
+
+
+def _nothing_line(language):
+    """The empty-section note: the label without its full stop, lower-cased
+    first letter, in parentheses -- "(nothing to report this time)"."""
+    text = _label("nothing_to_report", language).rstrip(".。 ")
+    return f"({text[:1].lower()}{text[1:]})"
+
+
 def _owner_language(config):
     if not isinstance(config, dict):
         return ""
@@ -628,7 +643,7 @@ def source_markup(url, label=None):
     return escaped
 
 
-def chat_section(section):
+def chat_section(section, language=""):
     """One topic's block in the chat edition."""
     title = section["title"].strip()
     tag = section.get("tag")
@@ -660,17 +675,17 @@ def chat_section(section):
             lines.append(f"  {item['time'].strip()} {item['title'].strip()}")
     else:
         body = section.get("body", "").strip()
-        lines.append(f"  {body}" if body else "  (nothing to report this time)")
+        lines.append(f"  {body}" if body else f"  {_nothing_line(language)}")
     sources = dedupe(section.get("sources", []))
     could_not = section.get("could_not_source", [])
     if desk != "priority" and sources:
-        lines.append("  Sources: " + ", ".join(sources))
+        lines.append(f"  {_label('sources', language)} " + ", ".join(sources))
     if could_not:
-        lines.append("  Couldn't source: " + "; ".join(could_not))
+        lines.append(f"  {_label('could_not_source', language)} " + "; ".join(could_not))
     return "\n".join(lines)
 
 
-def render_chat(edition, name):
+def render_chat(edition, name, language=""):
     header = f"{name} \u2014 {pretty_date(edition['date'])}"
     location = (edition.get("location") or "").strip()
     if location:
@@ -679,10 +694,10 @@ def render_chat(edition, name):
     if edition["sections"]:
         for _index, section in ordered_sections(edition["sections"]):
             lines.append("")
-            lines.append(chat_section(section))
+            lines.append(chat_section(section, language))
     else:
         lines.append("")
-        lines.append("Nothing to report this time.")
+        lines.append(_label("nothing_to_report", language))
     return "\n".join(lines) + "\n"
 
 
@@ -714,7 +729,7 @@ def weather_icon(key, size=28):
     )
 
 
-def weather_ear_html(weather_sections):
+def weather_ear_html(weather_sections, language=""):
     """The masthead's right ear: today's icon and high/low when the
     notes have a forecast. A weather desk that failed research (no
     forecast, named in could_not_source) must not look like a complete
@@ -742,7 +757,7 @@ def weather_ear_html(weather_sections):
         if misses:
             return (
                 '<span class="ear-box">'
-                "Couldn't source<br>"
+                f"{html.escape(_label('could_not_source', language).rstrip(':： '), quote=False)}<br>"
                 f"{html.escape(misses[0])}"
                 "</span>"
             )
@@ -905,7 +920,7 @@ def recommendation_char_count(recommendation):
     return sum(len(" ".join(text.split())) for text in texts)
 
 
-def priority_block(priority):
+def priority_block(priority, language=""):
     """Ranked recommendation essays, followed by questions for the owner."""
     recommendations = []
     for rank, recommendation in enumerate(priority["recommendations"], 1):
@@ -920,7 +935,7 @@ def priority_block(priority):
             f'<article class="priority-rec"><p class="priority-rank">{rank}</p>'
             f'<h2>{_esc(recommendation["headline"])}</h2>{paragraphs}'
             f'<ol class="priority-evidence">{evidence}</ol>'
-            f'<p class="priority-step"><strong>FIRST STEP</strong> {_esc(recommendation["first_step"])}</p>'
+            f'<p class="priority-step"><strong>{_esc(_label("first_step", language))}</strong> {_esc(recommendation["first_step"])}</p>'
             f'<blockquote>“{_esc(advisor["quote"])}” <span class="src">— '
             f'<a href="{_esc(advisor["url"])}">{_esc(advisor["name"])}</a></span></blockquote></article>'
         )
@@ -946,7 +961,7 @@ def priority_block(priority):
         '</div>'
     ]
     if priority.get("questions"):
-        blocks.append(_inline('QUESTIONS FOR YOU · TEXT “Q2: …”', priority["questions"]))
+        blocks.append(_inline(_label("questions", language), priority["questions"]))
     return "\n".join(blocks)
 
 
@@ -1146,9 +1161,9 @@ def html_section(section, drop_cap=False, language=""):
         blocks.append(games_list(games))
     if priority:
         if section.get("as_of"):
-            label = "Conselho de" if is_portuguese(language) else "Advice from"
+            label = _label("advice_from", language)
             blocks.append(f'  <p class="priority-asof">{label} {section["as_of"]}</p>')
-        blocks.append(priority_block(priority))
+        blocks.append(priority_block(priority, language))
     if skip_body:
         pass
     elif paras:
@@ -1162,16 +1177,16 @@ def html_section(section, drop_cap=False, language=""):
             else:
                 blocks.append(f"  <p>{html.escape(para)}</p>")
     else:
-        blocks.append("  <p>(nothing to report this time)</p>")
+        blocks.append(f"  <p>{html.escape(_nothing_line(language), quote=False)}</p>")
     # The priority desk's sources were our own plumbing ("Sources: priority desk").
     sources = dedupe(section.get("sources", [])) if desk != "priority" else []
     if sources:
         links = ", ".join(source_markup(url) for url in sources)
-        blocks.append(f'  <p class="sources">Sources: {links}</p>')
+        blocks.append(f'  <p class="sources">{html.escape(_label("sources", language), quote=False)} {links}</p>')
     could_not = section.get("could_not_source", [])
     if could_not:
         items = "; ".join(html.escape(item) for item in could_not)
-        blocks.append(f'  <p class="unsourced">Couldn\'t source: {items}</p>')
+        blocks.append(f'  <p class="unsourced">{html.escape(_label("could_not_source", language), quote=False)} {items}</p>')
     blocks.append("</article>")
     return "\n".join(blocks)
 
@@ -1198,7 +1213,7 @@ def render_html(edition, name, template_text, language=""):
         lead_html = ""
         rest = []
     else:
-        lead_html = '<article class="section"><p>Nothing to report this time.</p></article>'
+        lead_html = f'<article class="section"><p>{html.escape(_label("nothing_to_report", language), quote=False)}</p></article>'
         rest = []
 
     pair_cells = "".join(
@@ -1237,7 +1252,7 @@ def render_html(edition, name, template_text, language=""):
     if inline_parts:
         cells = "".join(f'<div class="desks-cell">{part}</div>' for part in inline_parts)
         desks_inline_html = f'<div class="desks-row">{cells}</div>'
-    weather_ear = weather_ear_html(weather)
+    weather_ear = weather_ear_html(weather, language)
 
     location = html.escape((edition.get("location") or "").strip() or "One copy")
     slots = {
@@ -1325,7 +1340,7 @@ def main(argv=None):
                  "re-run that desk's gather instead of reusing yesterday's file")
 
     name = masthead()
-    chat_text = render_chat(edition, name)
+    chat_text = render_chat(edition, name, _owner_language(config))
 
     if args.chat:
         pathlib.Path(args.chat).write_text(chat_text)

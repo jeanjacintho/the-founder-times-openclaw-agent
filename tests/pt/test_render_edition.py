@@ -1095,3 +1095,59 @@ class TestFillNewsDesk:
         assert data["sections"][0]["desk"] == "news"
         assert data["sections"][1]["desk"] == "news"
         assert data["sections"][2]["desk"] == "weather"
+
+
+ENGLISH_LABELS = ("FIRST STEP", "QUESTIONS FOR YOU", "Sources:", "Couldn't source", "Couldn&#x27;t source",
+                  "Nothing to report this time", "nothing to report this time", "Advice from")
+
+
+class TestLabelsFollowTheOwnersLanguage:
+    """The page's own vocabulary comes from owner_phrases.py: curated English and
+    Portuguese, and whatever language the paper wrote its phrases in."""
+
+    @staticmethod
+    def _every_label_edition():
+        page = recommendation_edition(questions=["Q2 — O que mudou?"])
+        page["sections"][0]["as_of"] = "2026-09-10"
+        for desk in ("weather", "calendar", "mail", "sports", "news"):
+            page["sections"].append({
+                "kind": "assignment", "topic_id": f"t_{desk}", "run_on": "2026-09-11", "desk": desk,
+                "title": desk, "body": " ", "sources": ["https://shop.example/x"],
+                "could_not_source": ["o preço do modelo Pro"],
+            })
+        return page
+
+    @staticmethod
+    def _render(page, language):
+        html = render.render_html(page, render.DEFAULT_MASTHEAD,
+                                  "{{LEAD}}{{PRIORITY}}{{PRIORITY_BLOCK}}{{WEATHER_EAR}}{{DESKS_INLINE}}",
+                                  language=language)
+        chat = render.render_chat(page, render.DEFAULT_MASTHEAD, language=language)
+        empty = render.render_chat(edition(sections=[]), render.DEFAULT_MASTHEAD, language=language)
+        return html + chat + empty
+
+    def test_a_written_language_leaves_no_english_label(self, tmp_path, monkeypatch):
+        phrases = load_module("owner_phrases", "pt-shared/scripts/owner_phrases.py")
+        monkeypatch.setenv("PT_HOME", str(tmp_path))
+        table = {k: (f"〔{k}〕" if k.startswith("page.") else v) for k, v in phrases.SOURCE.items()}
+        (tmp_path / "owner-phrases.json").write_text(
+            json.dumps({"language": "Mandarin Chinese", "phrases": table}, ensure_ascii=False))
+        out = self._render(self._every_label_edition(), "Mandarin Chinese")
+        for english in ENGLISH_LABELS:
+            assert english not in out, english
+        for key in ("first_step", "questions", "sources", "could_not_source", "nothing_to_report", "advice_from"):
+            assert f"〔page.{key}〕" in out, key
+
+    def test_portuguese_gets_the_curated_labels(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PT_HOME", str(tmp_path))
+        out = self._render(self._every_label_edition(), "Português")
+        for english in ENGLISH_LABELS:
+            assert english not in out, english
+        for label in ("PRIMEIRO PASSO", "PERGUNTAS PARA VOCÊ", "Fontes:", "Sem fonte", "Nada a relatar desta vez", "Conselho de"):
+            assert label in out, label
+
+    def test_no_language_reads_as_today(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PT_HOME", str(tmp_path))
+        out = self._render(self._every_label_edition(), "")
+        for english in ("FIRST STEP", "QUESTIONS FOR YOU", "Sources:", "Couldn't source", "Advice from", "Nothing to report this time."):
+            assert english in out, english
