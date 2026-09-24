@@ -3,9 +3,10 @@ import { createHash } from "node:crypto";
 import { defineChannelPluginEntry, type ChannelPlugin, type PluginRuntime, type OpenClawConfig } from "openclaw/plugin-sdk/channel-core";
 import { loadWebMedia } from "openclaw/plugin-sdk/web-media";
 import { request, listen, accepts, ownerChat, HttpError, DeliveryUnknownError, type Account, type Chat, type Message, type TurnOutcome } from "./transport.ts";
+import { gateContext, isOwnerDm, runGate } from "./setup-gate.ts";
 
 let runtime: PluginRuntime;
-const activeTurn = new AsyncLocalStorage<{ chat: Chat; messageUid: string; deliveryUnknown?: boolean; replyDelivered?: boolean }>();
+const activeTurn = new AsyncLocalStorage<{ chat: Chat; messageUid: string; account?: Account; deliveryUnknown?: boolean; replyDelivered?: boolean }>();
 
 async function requestWithDeliveryState<T>(account: Account, path: string, body: unknown): Promise<T> {
   const turn = activeTurn.getStore();
@@ -83,7 +84,7 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
     media,
   });
   log(`turn ${JSON.stringify({ chat: chat.uid, message: message.uid, first_contact: firstContact, senderId, senderName, senderIsOwner, sessionKey: route.sessionKey })}`);
-  return await activeTurn.run({ chat, messageUid: message.uid }, async () => {
+  return await activeTurn.run({ chat, messageUid: message.uid, account }, async () => {
     let failure: unknown;
     let completed = false;
     if (account.accountId === "chat") await request(account, `/chats/${chat.uid}/typing`, { action: "start" }).catch(() => log("typing start failed"));
@@ -158,6 +159,13 @@ export default defineChannelPluginEntry({
   setRuntime: value => { runtime = value; },
   registerFull(api) {
     if (api.registrationMode === "full") api.logger.info("plow channel registered");
+    // The owner's own phone DM starts from the newspaper's setup gate.
+    api.on("before_prompt_build", async () => {
+      const turn = activeTurn.getStore();
+      if (!turn?.account || turn.account.accountId !== "chat" || !isOwnerDm(turn.chat, turn.account.lineUid)) return;
+      const output = await runGate();
+      return output ? { prependContext: gateContext(output) } : undefined;
+    });
   },
   registerCapabilities(api) {
     api.registerTool(context => ({
