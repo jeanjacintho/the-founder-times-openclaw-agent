@@ -2,7 +2,7 @@
 
 The wiki is plow-wiki: an Obsidian vault at ~/Plow/wiki in OKF v0.2, kept by
 the `wiki` plugin Latch bundles. The paper owns one root,
-projects/theplowtimes (writer `theplowtimes`, this agent's AGENT_ID), and
+projects/theplowtimes (writer `theplowtimes`, the wiki name the paper has always used), and
 shares one page, entities/owner/goals.md. Pages move with plow_read_file and
 plow_write_file (no approval inside ~/Plow); the CLI runs through
 plow_run_command, under whatever approval mode the Mac is in.
