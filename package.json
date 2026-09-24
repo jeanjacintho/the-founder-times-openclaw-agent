@@ -2,6 +2,11 @@
   "name": "@plow/openclaw-agent-checks",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "npm run test:py && npm run test:node",
+    "test:py": "uv run --no-project --python 3.13 --with pytest==8.4.2 --with \"plow-wiki @ git+https://github.com/plow-pbc/plow-wiki@4faad4d9c9b15e3fb1ea6919e7334a814270e02e\" pytest -q tests/pt",
+    "test:node": "docker build -t plow-openclaw:test . && docker run --rm --user root --network none -v \"$PWD/node_modules:/opt/plow/node_modules:ro\" -v \"$PWD/tests:/opt/plow/tests:ro\" plow-openclaw:test sh -c '/opt/plow/node_modules/.bin/tsc --noEmit -p /opt/plow/tsconfig.json && mkdir -p /opt/plow/plugin/node_modules && ln -s /app /opt/plow/plugin/node_modules/openclaw && node --test /opt/plow/tests/*.test.ts' && docker run --rm --network none plow-openclaw:test /opt/plow/probe"
+  },
   "devDependencies": {
     "@types/node": "26.6.2",
     "@types/ws": "8.18.1",
