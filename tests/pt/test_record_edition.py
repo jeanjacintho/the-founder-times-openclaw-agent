@@ -306,3 +306,27 @@ class TestResearchTextIsInertInTheWiki:
         assert "The real rose 1%." in body
         assert "BRL up 1% on Sep 18 (https://news.example/fx)" in body
         assert "Q1 — Which customer would publicly vouch for you?" in body
+
+
+class TestSectionMemoryIsRecordedWhereverTheEditionFileSits:
+    """Measured live 2026-09-24: the edition file sat at run/edition.json, not
+    run/<id>/edition.json, so the recorder looked for notes beside `pt/` and
+    recorded `printed: []` for every news section -- the next paper then had no
+    history to stay off. Notes live where pt-research writes them."""
+
+    @pytest.mark.parametrize("edition_at", ["run/edition.json", "run/daily-2026-09-24/edition.json"])
+    def test_printed_claims_are_recorded(self, mac, tmp_path, monkeypatch, edition_at):
+        home = tmp_path / "pt"
+        monkeypatch.setenv("PT_HOME", str(home))
+        notes_dir = home / "run" / "t_9f2a"
+        notes_dir.mkdir(parents=True)
+        (notes_dir / "notes.json").write_text(json.dumps({"topic_id": "t_9f2a", "notes": [
+            {"claim": "BRL up 1% on Sep 18", "url": "https://news.example/fx", "quote": "…"}]}))
+        path = home / edition_at
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"date": "2026-09-19", "location": "Sao Paulo", "sections": [
+            {"kind": "section", "topic_id": "t_9f2a", "desk": "news", "title": "The dollar",
+             "headline": "The real firms", "body": "The real rose 1%.", "sources": ["https://news.example/fx"]}]}))
+        rec.record(Wiki(mac.call_tool), path, "cht_1", MORNING)
+        meta = split_page(day(mac))[0]
+        assert meta["sections"]["t_9f2a"]["printed"] == [{"claim": "BRL up 1% on Sep 18", "url": "https://news.example/fx"}]
