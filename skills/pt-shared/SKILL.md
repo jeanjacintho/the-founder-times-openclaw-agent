@@ -6,7 +6,7 @@ description: The helper library every pt-* skill imports — the pt-config gate,
 # pt-shared — the pt-* skills' shared helpers
 
 Every pt-* skill's scripts reach this directory by its absolute deploy path,
-`/var/lib/hermes/skills/pt-shared/scripts`, never a `../../` relative path
+`/opt/plow/skills/pt-shared/scripts`, never a `../../` relative path
 (`terminal.cwd` is unset on this agent, so a relative path never
 resolves). This skill still has to land beside its siblings in the
 agent's skills store, and it carries a `SKILL.md` for the same reason
@@ -92,7 +92,7 @@ does not, and every run fails on the import.
 - `scripts/run_lock.py` — one exclusive run per name with stale takeover, so
   two daily-paper runs can never race and deliver a hollow edition.
   Called bare, never through an interpreter:
-  `/var/lib/hermes/skills/pt-shared/scripts/run_lock.py acquire --name NAME [--stale-minutes N]`
+  `/opt/plow/skills/pt-shared/scripts/run_lock.py acquire --name NAME [--stale-minutes N]`
   and the matching `.../run_lock.py release --name NAME`. Prints one word
   (`acquired` / `stale-takeover` / `held`) and always exits 0 on acquire.
 - `scripts/prepare_daily_run.py` — immediately after any paper lock is acquired,

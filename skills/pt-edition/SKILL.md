@@ -216,7 +216,7 @@ HTML.** Hand-write `edition.json` under the run directory:
 
 Not a topic and not built in the chat turn: `pt-intake` queues the main
 paper's own prompt as a one-shot with
-`/var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py --now`, and
+`/opt/plow/skills/pt-dashboard/scripts/register_crons.py --now`, and
 this skill delivers it from that session like any other paper (no
 `--hold-until`; the advisor card per desks.md, dated with `as_of` when older).
 
@@ -226,7 +226,7 @@ this skill delivers it from that session like any other paper (no
    complete command, printer or not; **copy it and change only the
    paths.** Do not add flags that are not here:
 
-       /var/lib/hermes/skills/pt-edition/scripts/render_edition.py <edition.json> --tournament /var/lib/hermes/pt/run/desk-priority/tournament.json --pdf run/<id>/edition.pdf --companion run/<id>/edition.companion.txt
+       /opt/plow/skills/pt-edition/scripts/render_edition.py <edition.json> --tournament /var/lib/plow/pt/run/desk-priority/tournament.json --pdf run/<id>/edition.pdf --companion run/<id>/edition.companion.txt
 
    The printed page is this same PDF. `--chat PATH` is optional and takes
    a path when used; the chat transcript is not posted, so you normally
@@ -261,7 +261,7 @@ this skill delivers it from that session like any other paper (no
    `edition.companion.txt`, it contains only the mail/sports desks omitted
    from print; include it with `--text-file`. This is not the full chat dump:
 
-       /var/lib/hermes/skills/pt-shared/scripts/post_to_chat.py --pdf run/<id>/edition.pdf --text-file run/<id>/edition.companion.txt --filename The-Founder-Times-<date>.pdf
+       /opt/plow/skills/pt-shared/scripts/post_to_chat.py --pdf run/<id>/edition.pdf --text-file run/<id>/edition.companion.txt --filename The-Founder-Times-<date>.pdf
 
    When no companion file exists, omit only `--text-file`; the PDF posts with
    an empty body, the same envelope used for attachment-only sends.
@@ -275,7 +275,7 @@ this skill delivers it from that session like any other paper (no
    genuinely absent — never because your own command failed. In that one
    case the text leg is also a complete command, with no shell redirect:
 
-       /var/lib/hermes/skills/pt-shared/scripts/post_to_chat.py --text-file run/<id>/edition.chat.txt
+       /opt/plow/skills/pt-shared/scripts/post_to_chat.py --text-file run/<id>/edition.chat.txt
 
    Use `--text-file`, never `< file`, never `/bin/sh -c`, never a pipe
    (SOUL.md: one bare line). Pointing `--pdf` at a file that does not exist is

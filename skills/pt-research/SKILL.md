@@ -31,12 +31,12 @@ that found 3 of 5 sources reports 3 sources; it does not keep hunting.
    paper's prompt has already reopened yesterday's.
 1. Read the topic (or each news topic of the batch) from `pt/topics.json` (the id
    is in your prompt). Mark it running first:
-   `/var/lib/hermes/skills/pt-intake/scripts/topics.py mark <id> --status running`. If it is
+   `/opt/plow/skills/pt-intake/scripts/topics.py mark <id> --status running`. If it is
    already `running`, another run is working on it — skip it rather than
    racing it.
 
    Then, for a `section`, read what it already printed:
-   `/var/lib/hermes/skills/pt-priority/scripts/history.py recent --topic <id>`
+   `/opt/plow/skills/pt-priority/scripts/history.py recent --topic <id>`
    — `[{"date", "headline", "printed": [{"claim", "url"}]}]` for today and
    the 7 days before it, oldest first. Those URLs are already spent and
    those claims are already made: **this pass is what changed since the
@@ -58,7 +58,7 @@ that found 3 of 5 sources reports 3 sources; it does not keep hunting.
    a one-line quote or tight paraphrase. Then move on. Do not re-read a page
    you have used; do not open a page that cannot add a new fact.
 4. Write each topic's notes file as you go — not at the end — to
-   `/var/lib/hermes/pt/run/<topic_id>/notes.json`:
+   `/var/lib/plow/pt/run/<topic_id>/notes.json`:
 
    ```json
    {

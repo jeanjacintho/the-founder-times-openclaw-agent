@@ -25,6 +25,8 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from pt_paths import config_file
+
 # A sentinel, not a Path: PT_HOME (tests point it at a tmp dir, same as
 # topics.py/run_lock.py/record_edition.py) has to be read at call time, not
 # baked in as a default at import time.
@@ -34,7 +36,7 @@ CONFIG = object()
 def _config_path(config_path):
     if config_path is not CONFIG:
         return config_path
-    return Path(os.environ.get("PT_HOME", "/var/lib/hermes/pt")) / "config.json"
+    return config_file()
 
 
 def owner_now(config_path=CONFIG):

@@ -5,7 +5,7 @@ file's order. The daily run always fills weather and calendar. Priority
 runs only when `pt/config.json` has `"priority": { "configured": true }`.
 Mail joins only when it has `"mail": { "configured": true }`; sports
 joins only when it has `"sports": { "configured": true }`. Ordinary desk notes go under
-`/var/lib/hermes/pt/run/desk-<name>/notes.json` (same shape as a topic
+`/var/lib/plow/pt/run/desk-<name>/notes.json` (same shape as a topic
 notes file, `topic_id` omitted; every desk file also carries a top-level
 `"date": "<today>"`, and `render_edition.py` refuses one with none or another
 day's when the edition carries a standing desk, so a failed gather cannot
@@ -25,7 +25,7 @@ accepted checkpoint (dated today, at its completed third-generation gate — wha
 copy never waits on a tournament: it reuses that checkpoint whatever its date, and pt-edition
 prints an older one with its `as_of` date. With none to reuse (none today for a scheduled
 paper; none ever accepted for the on-demand copy), run
-`/var/lib/hermes/skills/pt-shared/scripts/wiki_setup.py --desk`,
+`/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk`,
 then load `pt-priority` and follow it. `pt-priority` alone writes the atomic
 `run/desk-priority/tournament.json` checkpoint. It reads the owner's sources itself and spends no
 web budget. The morning run has no checkpoint for today yet; a later paper the same day reuses it.
@@ -237,8 +237,8 @@ A, `nba`, `nfl`, ...) — confirm the exact slug for the owner's league in
 the same Latch browser session (ESPN's own site URL for that league's
 scores page names it) rather than guessing. Then `plow_browser` `action:
 "goto"` that scoreboard URL and `action: "text"` to read the JSON. Do
-not `curl` it, do not `plow_run_command` it, do not use Hermes
-`web_extract`. It needs no Latch Google connector and no login, unlike
+not `curl` it, do not `plow_run_command` it, do not use a container web
+tool (`web_fetch`). It needs no Latch Google connector and no login, unlike
 mail — but it still has to be the Mac's browser.
 
 From the response, find each followed team's own game (by team name/abbr

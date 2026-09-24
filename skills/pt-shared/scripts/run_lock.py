@@ -2,11 +2,11 @@
 """run_lock.py -- one exclusive run per name, with stale takeover.
 
 The daily paper's run is not idempotent and must not run twice at once.
-A manual `hermes cron run` alongside the scheduled fire would start a
+A manual `openclaw cron run` alongside the scheduled fire would start a
 second session; the second finds every section already `running` (the
 per-topic guard refuses to duplicate), compiles an empty edition, and
 delivers it -- honest in form and misleading in effect, the one job this
-agent must never do. `hermes cron` has no dedup, so the lock is a file
+agent must never do. The scheduler has no dedup, so the lock is a file
 created with O_EXCL: the atomic primitive every process on the host agrees
 on.
 
@@ -25,7 +25,7 @@ session reads the decision instead of a status code:
 `release` removes the lock; a missing lock is not an error (the run ended
 without acquiring, or two releases raced). The lock directory is
 `$PT_HOME/run` -- the same scratch space the notes live in, default
-/var/lib/hermes/pt.
+/var/lib/plow/pt.
 """
 from __future__ import annotations
 
@@ -36,12 +36,14 @@ import re
 import sys
 from datetime import datetime, timezone
 
+from pt_paths import pt_home
+
 DEFAULT_STALE_MINUTES = 120
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def home():
-    return pathlib.Path(os.environ.get("PT_HOME", "/var/lib/hermes/pt"))
+    return pt_home()
 
 
 def lock_path(name):

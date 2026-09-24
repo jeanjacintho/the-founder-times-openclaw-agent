@@ -14,7 +14,7 @@ import sys
 
 import pytest
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[2] / "skills"
 sys.path.insert(0, str(ROOT / "pt-shared" / "scripts"))
 
 from latch_mcp import LatchError

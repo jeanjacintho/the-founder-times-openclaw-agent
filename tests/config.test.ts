@@ -87,7 +87,12 @@ test("phone turns cannot block on ask_user", () => {
 test("native messaging retains local workspace and memory file tools", () => {
   assert.deepEqual(renderConfig(identity, "http://api:8000").tools, {
     profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "plow_start_thread"], deny: ["ask_user"],
+    exec: { pathPrepend: ["/opt/plow/pt-venv/bin"] },
   });
+});
+
+test("exec resolves python3 to the newspaper venv", () => {
+  assert.deepEqual(renderConfig(identity, "http://api:8000").tools.exec, { pathPrepend: ["/opt/plow/pt-venv/bin"] });
 });
 
 test("private transcript recall is disabled across isolated conversations", () => {

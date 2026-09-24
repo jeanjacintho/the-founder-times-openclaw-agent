@@ -7,6 +7,8 @@ import os
 from datetime import date, datetime
 from pathlib import Path
 
+from pt_paths import pt_home
+
 
 def _dated_directory(name: str) -> bool:
     if len(name) != 10:
@@ -46,7 +48,7 @@ def prepare(pt_home: Path, now: datetime | None = None,
 
     stamp = (now or datetime.now().astimezone()).strftime("%Y%m%d-%H%M%S")
     # Keep recoverable evidence outside the research tree.  The run agent is
-    # told to inspect /var/lib/hermes/pt, and exposing a fresh archive there
+    # told to inspect /var/lib/plow/pt, and exposing a fresh archive there
     # invited it to copy yesterday's notes instead of doing today's work.
     archive_root = pt_home.parent / f".{pt_home.name}-run-archives"
     archive_root.mkdir(exist_ok=True)
@@ -68,8 +70,8 @@ def main() -> None:
         help="keep the accepted advisor checkpoint while clearing every other desk",
     )
     args = parser.parse_args()
-    pt_home = Path(os.environ.get("PT_HOME", "/var/lib/hermes/pt"))
-    prepare(pt_home, preserve_priority=args.preserve_priority)
+    home = pt_home()
+    prepare(home, preserve_priority=args.preserve_priority)
     # The caller needs only the clean-workspace result.  Do not advertise the
     # recovery path to the model that is about to research today's paper.
     print("READY")

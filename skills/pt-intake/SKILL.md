@@ -12,9 +12,9 @@ write, schedule, confirm with a time. Nothing more.
 
 Two local files, both cheap:
 
-- `/var/lib/hermes/pt/topics.json` — run `topics.py list` for the readable form
-- `/var/lib/hermes/pt/config.json` — delivery preferences (run
-  `/var/lib/hermes/skills/pt-shared/scripts/pt_config_gate.py` on it if it looks wrong)
+- `/var/lib/plow/pt/topics.json` — run `topics.py list` for the readable form
+- `/var/lib/plow/pt/config.json` — delivery preferences (run
+  `/opt/plow/skills/pt-shared/scripts/pt_config_gate.py` on it if it looks wrong)
 
 Answer status questions from these files, never from
 session memory — another session may have delivered since yours started.
@@ -29,7 +29,7 @@ change to narrate.
 These are ordinary turns, not classifications. Do them and end:
 
 - **"what are you watching" / "list my topics"** — run
-  `/var/lib/hermes/skills/pt-intake/scripts/topics.py list` and render it as a short list:
+  `/opt/plow/skills/pt-intake/scripts/topics.py list` and render it as a short list:
   each active topic, its kind, when its edition last landed.
 - **"list my paper" / "what's in my paper" / "list my papers"** — run
   `topics.py list` and group by paper, on pt-research's rosters: the main
@@ -41,7 +41,7 @@ These are ordinary turns, not classifications. Do them and end:
 - **"stop watching X" / "drop X from my paper"** — resolve X against the
   active topics; if ambiguous, ask which one and stop. Then
   `topics.py cancel <id>`, and immediately run
-  `/var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py` so the nightly job is
+  `/opt/plow/skills/pt-dashboard/scripts/register_crons.py` so the nightly job is
   removed now rather than at the next bring-up. Confirm in one line.
 - **"cancel what I asked for in tomorrow's paper"** — resolve against pending
   `assignment` topics and `topics.py cancel <id>`. A delivered assignment is
@@ -56,7 +56,7 @@ These are ordinary turns, not classifications. Do them and end:
   in the owner's own clock like it. Append (or remove) the time they name
   in `extra_hours`, validate with
   `pt_config_gate.py`, paste its output, then re-run
-  `/var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py` so
+  `/opt/plow/skills/pt-dashboard/scripts/register_crons.py` so
   `pt-daily-edition-2` (or `-3`, numbered by list order) exists or is
   removed **now** — never a hand-registered cron (see `pt-dashboard`).
   Confirm in one line, in the owner's own terms —
@@ -91,7 +91,7 @@ These are ordinary turns, not classifications. Do them and end:
 Only when `priority.configured` is true. When the owner corrects the desk, answers a
 question the paper asked ("Q2: …"), or states something durable about their work — "Raj is
 my cousin, not a customer", "stop telling me to hire", "we signed our first pilot" — this
-is not a topic. Run `/var/lib/hermes/skills/pt-shared/scripts/wiki_setup.py --desk` first
+is not a topic. Run `/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk` first
 (idempotent; it seeds or carries over the page) — an `error:` line means the Mac's wiki
 isn't reachable: say so in one line and write nothing, the correction will need resending.
 Then `mcp__plow__plow_read_file` `~/Plow/wiki/entities/owner/goals.md`, append one line
@@ -182,7 +182,7 @@ Two rules that keep the paper honest:
 
 Then write it — this script is the ONLY writer for topics.json:
 
-    /var/lib/hermes/skills/pt-intake/scripts/topics.py add --text "<the topic, in the owner's words>" --kind one_off|subscription|section|assignment --depth quick|deep [--run-on YYYY-MM-DD] [--deliver-at HH:MM] [--scheduled-for <ISO-8601 with offset; required for one_off>]
+    /opt/plow/skills/pt-intake/scripts/topics.py add --text "<the topic, in the owner's words>" --kind one_off|subscription|section|assignment --depth quick|deep [--run-on YYYY-MM-DD] [--deliver-at HH:MM] [--scheduled-for <ISO-8601 with offset; required for one_off>]
 
 Adding a `section` the owner already has is a no-op: the script prints
 `{"duplicate_of": "<id>", ...}` and adds nothing, because a section is an
@@ -206,7 +206,7 @@ Every stored hour is the owner's own clock; `register_crons.py` (spec in
 
 - **Section** — nothing to schedule by hand: write the topic (with
   `--deliver-at` when it belongs to a non-main paper), then run
-  `/var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py` so
+  `/opt/plow/skills/pt-dashboard/scripts/register_crons.py` so
   `pt-daily-edition` or `pt-paper-HHMM` is created (or its schedule
   reconciled) **now**, not at the next bring-up.
   Paste the script's output and report its exit status.
@@ -221,12 +221,12 @@ Every stored hour is the owner's own clock; `register_crons.py` (spec in
   not passed, tomorrow otherwise), so the result lands with the morning
   paper. Record it at add time as an ISO-8601 instant with the owner's
   offset via `--scheduled-for`, then run
-  `/var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py`. It
+  `/opt/plow/skills/pt-dashboard/scripts/register_crons.py`. It
   creates `pt-oneoff-<id>` at that `scheduled_for` with the topic's own
   prompt and the deliver target baked in; the sweep removes it once the
   topic is delivered.
 - **Subscription** — write the topic, then run
-  `/var/lib/hermes/skills/pt-dashboard/scripts/register_crons.py` so `pt-subscription-<id>`
+  `/opt/plow/skills/pt-dashboard/scripts/register_crons.py` so `pt-subscription-<id>`
   exists now.
 
 If `register_crons.py` fails, say so — a topic

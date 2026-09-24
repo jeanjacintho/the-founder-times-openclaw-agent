@@ -27,7 +27,7 @@ class TestComposePayload:
         }
 
     def test_attachment_filename_defaults_to_basename(self):
-        assert post.attachment_filename("/var/lib/hermes/pt/run/edition.pdf") == (
+        assert post.attachment_filename("/var/lib/plow/pt/run/edition.pdf") == (
             "edition.pdf"
         )
 
@@ -37,7 +37,7 @@ class TestComposePayload:
         # the newspaper, not a working-file name.
         assert (
             post.attachment_filename(
-                "/var/lib/hermes/pt/run/edition.pdf",
+                "/var/lib/plow/pt/run/edition.pdf",
                 "The-Founder-Times-2026-09-17.pdf",
             )
             == "The-Founder-Times-2026-09-17.pdf"

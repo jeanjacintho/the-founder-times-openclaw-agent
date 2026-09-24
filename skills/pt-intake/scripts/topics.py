@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""topics.py -- the single writer for /var/lib/hermes/pt/topics.json.
+"""topics.py -- the single writer for /var/lib/plow/pt/topics.json.
 
 The topic list is this agent's ENTIRE durable model of what it has been
 asked to do (design doc §3.3): every subscription's nightly cron, every
@@ -56,7 +56,7 @@ Status transitions (design doc §3.3):
                                        cannot be cancelled
 
 `PT_HOME` overrides the state directory (tests use it); it defaults to
-/var/lib/hermes/pt. Timestamps are ISO 8601 with the container's offset.
+/var/lib/plow/pt. Timestamps are ISO 8601 with the container's offset.
 """
 from __future__ import annotations
 
@@ -70,6 +70,9 @@ import sys
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "pt-shared" / "scripts"))
+from pt_paths import pt_home  # noqa: E402
+
 TOPICS_FILE = "topics.json"
 KINDS = ("one_off", "subscription", "section", "assignment")
 DEPTHS = ("quick", "deep")
@@ -82,7 +85,7 @@ MUTATING_COMMANDS = {"add", "cancel", "mark", "finalize-edition", "reopen-sectio
 
 
 def home():
-    return pathlib.Path(os.environ.get("PT_HOME", "/var/lib/hermes/pt"))
+    return pt_home()
 
 
 def topics_path():

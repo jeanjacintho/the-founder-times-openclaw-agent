@@ -177,16 +177,14 @@ class LatchClient:
 def connect():
     """A session with the owner's Mac, over the relay the runtime published.
 
-    plow-init fetches `/v1/agents/me` at boot and writes its `mcp_url` to
-    `/run/s6/container_environment/PLOW_MCP_URL`, which s6 puts in every
-    service's environment -- measured present on both a hosted and a
-    self-hosted install. There is nothing to derive here: re-fetching the
+    Boot fetches `/v1/agents/me` and exports its `mcp_url` as PLOW_MCP_URL
+    into the gateway's environment, which exec passes to every script
+    (boot/newspaper-env.ts). There is nothing to derive here: re-fetching the
     identity would be a second source of truth for a URL the runtime already
     owns, and the runtime's copy is the one that carries a proxied agent's
-    proxied host. plow-init also manages the one `mcp_servers` entry that
-    reaches the Mac, enabling it exactly when that identity carries a relay,
-    so an agent without one has nothing to connect to rather than a server
-    that fails per call.
+    proxied host. Boot also declares the one MCP server that reaches the Mac
+    exactly when that identity carries a relay, so an agent without one has
+    nothing to connect to rather than a server that fails per call.
 
     There is no static-credential branch. `DOMO_DEVICE_UID` / `DOMO_MCP_TOKEN`
     are Latch's fallback for a client that cannot do OAuth; this agent is not
