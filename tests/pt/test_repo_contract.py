@@ -619,6 +619,19 @@ class TestSoul:
         criticize = skill[skill.index("### 2. Criticize"):skill.index("### 3. Cull")]
         assert "signal" in challenge and "unverified signal" in criticize
 
+    def test_a_failed_history_read_still_researches_with_a_caveat(self):
+        # A failed read of what a section printed loses de-duplication, not the
+        # ability to research: stopping there turned one connector failure
+        # into a blank news column. The error stays on record, the pass runs a
+        # fresh angle, and the page says a repeat is possible.
+        research = (ROOT / "pt-research" / "SKILL.md").read_text()
+        rule = research[research.index("An `error:` line is a failed read"):research.index("An assignment\n   has no history")]
+        assert "stop there" not in rule
+        assert "could_not_source" in rule
+        assert "fresh angle" in rule and "repeat is possible" in rule
+        assert "owner's language" in rule
+        assert "budget" in rule
+
     def test_signal_sources_change_later_only_through_their_script(self):
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         intake = (ROOT / "pt-intake" / "SKILL.md").read_text()

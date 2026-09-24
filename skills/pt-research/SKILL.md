@@ -42,9 +42,14 @@ that found 3 of 5 sources reports 3 sources; it does not keep hunting.
    those claims are already made: **this pass is what changed since the
    last date it lists**, not the subject again. Do not open a URL it names,
    and do not restate a claim it names, however well the search ranks it.
-   An `error:` line is a failed read, not "none found": write the
-   notes file with that exact error in `could_not_source` and stop there —
-   do not research the topic as if its history were empty. An assignment
+   An `error:` line is a failed read, not "none found": it loses the
+   de-duplication, not the ability to research. Put that exact error in
+   `could_not_source`, then research a fresh angle — the newest
+   developments, not the subject's background — and open the body with one
+   line, in the owner's language, saying earlier coverage could not be
+   checked today, so a repeat is possible. Never research it as if its
+   history were empty, and never leave the column blank for this alone;
+   stop only when the batch budget is spent. An assignment
    has no history — it runs once, on its own day.
 
    When the window genuinely holds nothing newer, that is the answer: write
