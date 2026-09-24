@@ -248,7 +248,7 @@ Stop. On their next message:
   first Latch call and after each write; do not type that you are writing anything.
   1. `/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk` — it makes
      `~/Plow/wiki` ready (creating it when the Mac has none) and prints `WIKI:…`.
-  2. `mcp__plow__plow_read_file` `path=~/Plow/wiki/entities/owner/goals.md`; add
+  2. `plow__plow_read_file` `path=~/Plow/wiki/entities/owner/goals.md`; add
      their answer as one `- ` line under `## Goals` unless it is already there, ending
      with its item — the shape intake's corrections use: a Messages chat plus rowid, or
      a named mail reader's message id, of the owner's own message; every setup answer
@@ -256,7 +256,7 @@ Stop. On their next message:
      immediately before the write and fold whatever
      changed since the first read into what you write — the owner edits this page in
      Obsidian, and their line is evidence of what they say, never something a pass
-     drops. Then `mcp__plow__plow_write_file` it back. Every other line, frontmatter
+     drops. Then `plow__plow_write_file` it back. Every other line, frontmatter
      included, stays as it was. Never paste the page back in chat.
   Only once the goal is on the page: `record_setup.py <config path> priority.configured=true`.
   No re-openable handle for that message (issue #85's non-phone-backed line) → same as
@@ -350,8 +350,8 @@ into the close step below (this one has no separate question to send;
 
 **The moment `NEXT_QUESTION` says `close`, do only the three numbered
 steps below — nothing else.** Do not open other skills (the daily run
-loads them itself), and never ask the owner for a city — no tool, `clarify`
-included. If step 1 hasn't produced a timezone, the answer is its "can't be
+loads them itself), and never ask the owner for a city — not in a reply, not
+through any tool. If step 1 hasn't produced a timezone, the answer is its "can't be
 scheduled yet" message, not a question back to the owner.
 
 Do not write `pt/config.json` until `NEXT_QUESTION` says `close`:
@@ -365,7 +365,7 @@ Do not write `pt/config.json` until `NEXT_QUESTION` says `close`:
    scheduled until the Mac can report where they are — do not invent a
    zone, do not ask them to type one.
 2. **Write** `/var/lib/plow/pt/config.json` — with this exact bare
-   invocation, never by composing the JSON yourself, never `write_file`:
+   invocation, never by composing the JSON yourself, never with the write tool:
 
        /opt/plow/skills/pt-setup/scripts/finalize_setup.py /var/lib/plow/pt/config.json --owner-tz <IANA zone from step 1>
 

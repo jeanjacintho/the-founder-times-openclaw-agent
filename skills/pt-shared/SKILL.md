@@ -7,12 +7,10 @@ description: The helper library every pt-* skill imports — the pt-config gate,
 
 Every pt-* skill's scripts reach this directory by its absolute deploy path,
 `/opt/plow/skills/pt-shared/scripts`, never a `../../` relative path
-(`terminal.cwd` is unset on this agent, so a relative path never
-resolves). This skill still has to land beside its siblings in the
-agent's skills store, and it carries a `SKILL.md` for the same reason
-`ld-shared` does: the boot reconcile copies a bundled directory into the home
-only when it carries one, and without this file the producers seed and this
-does not, and every run fails on the import.
+(a turn's working directory is the agent workspace, not this skill, so a
+relative path never resolves). The image bakes every pt-* skill under
+`/opt/plow/skills`, root-owned; this one carries a `SKILL.md` so the gateway
+lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
 
 - `scripts/pt_config_gate.py` — the single definition of a valid `pt/config.json`;
   prints failing invariant names, empty stdout is pass
@@ -38,6 +36,14 @@ does not, and every run fails on the import.
   `record_owner_language.py <config.json path> English`. Prints `LANG:<language>`.
   Setup-unfinished → draft; `READY` → `pt/config.json`. Skip only on a
   lone `yes`/`y`/`ok`/`okay`/`sim`/`no`/`não`/`nao`. **This bullet is the contract.**
+- `scripts/pt_paths.py` — the one place that names the paper's paths:
+  `pt_home()` (`/var/lib/plow/pt`), `skills()` (`/opt/plow/skills`),
+  `config_file()`, `script(skill, name)`; `PT_HOME` / `PT_SKILLS` override
+  them for tests. A library, not a command
+- `scripts/owner_chat.py` — bare, prints the owner's DM uid:
+  `PLOW_HOME_CHANNEL` when boot exported it, else asks `/v1/agents/me` (the
+  owner has not texted yet at boot). Every script that posts or records
+  calls its `home_channel()`; it exits by name when there is no owner's chat
 - `scripts/bearer_http.py` — one bearer JSON call that never follows a redirect
   (a forwarded Authorization header is the credential walking to a host the API
   did not authenticate)
