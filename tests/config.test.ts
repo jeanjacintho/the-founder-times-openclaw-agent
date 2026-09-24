@@ -53,14 +53,14 @@ test("provider and optional MCP use environment references, never credential val
   assert.equal(renderConfig(identity, "http://api:8000").mcp, undefined);
 });
 
-test("GLM falls back to Sonnet on the Plow provider with explicit capacity and pricing", () => {
+test("Opus 5 falls back to Sonnet on the Plow provider with explicit capacity and pricing", () => {
   const config = renderConfig(identity, "http://api:8000");
   assert.deepEqual(config.agents.defaults.model, {
-    primary: "plow/z-ai/glm-5.2", fallbacks: ["plow/anthropic/claude-sonnet-5"],
+    primary: "plow/anthropic/claude-opus-5", fallbacks: ["plow/anthropic/claude-sonnet-5"],
   });
   assert.deepEqual(config.models.providers.plow.models, [{
-    id: "z-ai/glm-5.2", name: "GLM 5.2", input: ["text"], contextWindow: 1048576,
-    cost: { input: 0.5544, output: 1.7424 },
+    id: "anthropic/claude-opus-5", name: "Claude Opus 5", input: ["text", "image"], contextWindow: 1000000,
+    contextTokens: 400_000, cost: { input: 5.00, output: 25.00 },
   }, {
     id: "anthropic/claude-sonnet-5", name: "Claude Sonnet 5", input: ["text", "image"], contextWindow: 1000000,
     cost: { input: 2.00, output: 10.00 },
@@ -76,17 +76,23 @@ test("MCP sessions share the loopback bridge and expire after five idle minutes"
   const config = renderConfig({ ...identity, mcp_url: "https://relay.internal/mcp" }, "http://api:8000");
   assert.deepEqual(config.mcp, { sessionIdleTtlMs: 300_000, servers: { plow: {
     url: "http://127.0.0.1:18790/mcp", transport: "streamable-http",
-    headers: { Authorization: "Bearer ${PLOW_MCP_BRIDGE_TOKEN}" },
+    headers: { Authorization: "Bearer ${PLOW_MCP_BRIDGE_TOKEN}" }, requestTimeoutMs: 300_000,
   } } });
 });
 
-test("phone turns cannot block on ask_user", () => {
-  assert.deepEqual(renderConfig(identity, "http://api:8000").tools.deny, ["ask_user"]);
+test("the advisor tournament can run six leaf sub-agents without chat turns preferring delegation", () => {
+  assert.deepEqual(renderConfig(identity, "http://api:8000").agents.defaults.subagents, {
+    maxChildrenPerAgent: 6, maxConcurrent: 6, maxSpawnDepth: 1, delegationMode: "suggest",
+  });
+});
+
+test("phone turns cannot block on ask_user or read secrets", () => {
+  assert.deepEqual(renderConfig(identity, "http://api:8000").tools.deny, ["ask_user", "secrets"]);
 });
 
 test("native messaging retains local workspace and memory file tools", () => {
   assert.deepEqual(renderConfig(identity, "http://api:8000").tools, {
-    profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "plow_start_thread"], deny: ["ask_user"],
+    profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "plow_start_thread"], deny: ["ask_user", "secrets"],
     exec: { pathPrepend: ["/opt/plow/pt-venv/bin"] },
   });
 });
