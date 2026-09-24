@@ -3,6 +3,74 @@ ARG PLOW_REVISION
 LABEL org.opencontainers.image.revision=$PLOW_REVISION co.plow.probe=/opt/plow/probe
 USER root
 RUN mkdir -p /opt/plow/skills /var/lib/plow && chown node:node /var/lib/plow
+
+# WeasyPrint's native dependencies (bookworm names). The wheel is pure Python
+# but binds Pango/Cairo through cffi at import time, so without these
+# `import weasyprint` fails with a cffi error that reads like a Python problem.
+# fonts-dejavu-core gives the page a guaranteed font with no fontconfig cache.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libpango-1.0-0 \
+      libpangocairo-1.0-0 \
+      libpangoft2-1.0-0 \
+      libharfbuzz0b \
+      libcairo2 \
+      libgdk-pixbuf-2.0-0 \
+      libffi8 \
+      shared-mime-info \
+      fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
+
+# The newspaper scripts' own Python: 3.13 (the version they are tested on;
+# the base ships 3.11) in a root-owned venv the agent cannot rewrite. uv is
+# pinned by version and checksum, used only at build time and removed; it
+# verifies the CPython download against the hashes it ships with.
+#
+# pydyf is pinned beside weasyprint on purpose: 62.3 declares only
+# pydyf>=0.10.0, and pydyf 0.12 moved its Stream API so every write_pdf() dies
+# with "'super' object has no attribute 'transform'".
+ARG UV_VERSION=0.11.19
+ARG UV_SHA256_AMD64=7035608168e106375b36d0c818d537a889c51a8625fe7f8f7cad5e62b947c368
+ARG UV_SHA256_ARM64=83b13ab184a45b7d9a3b0e4b10eaebd50ad41e66cb16dcce8e60aa7be13ae399
+ARG PT_PYTHON_VERSION=3.13.13
+ARG WEASYPRINT_VERSION=62.3
+ARG PYDYF_VERSION=0.10.0
+ARG PYYAML_VERSION=6.0.3
+ARG TARGETARCH
+RUN case "${TARGETARCH:-amd64}" in \
+      amd64) triple=x86_64-unknown-linux-gnu; sum="${UV_SHA256_AMD64}" ;; \
+      arm64) triple=aarch64-unknown-linux-gnu; sum="${UV_SHA256_ARM64}" ;; \
+      *) echo "uv: no pinned build for ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+ && curl -fsS --max-time 120 -L -o /tmp/uv.tgz \
+      "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${triple}.tar.gz" \
+ && echo "${sum}  /tmp/uv.tgz" | sha256sum -c - \
+ && mkdir /tmp/uv && tar -xzf /tmp/uv.tgz -C /tmp/uv --strip-components=1 \
+ && export UV_PYTHON_INSTALL_DIR=/opt/plow/python UV_CACHE_DIR=/tmp/uv-cache UV_NO_CONFIG=1 \
+ && /tmp/uv/uv python install "${PT_PYTHON_VERSION}" \
+ && /tmp/uv/uv venv --python "${PT_PYTHON_VERSION}" --no-python-downloads /opt/plow/pt-venv \
+ && /tmp/uv/uv pip install --python /opt/plow/pt-venv/bin/python3 \
+      "weasyprint==${WEASYPRINT_VERSION}" "pydyf==${PYDYF_VERSION}" "PyYAML==${PYYAML_VERSION}" \
+ && rm -rf /tmp/uv /tmp/uv.tgz /tmp/uv-cache \
+ && chmod -R a+rX,go-w /opt/plow/python /opt/plow/pt-venv
+
+# Exec runs `sh -c` / `bash --noprofile --norc -c` with tools.exec.pathPrepend
+# putting the venv first. A login shell (`bash -lc`) resets PATH from
+# /etc/profile, so the venv is prepended there too. The gateway's own PATH is
+# left alone: the Agent Index reporter keeps running on the system python3.
+RUN printf 'PATH="/opt/plow/pt-venv/bin:$PATH"\nexport PATH\n' > /etc/profile.d/pt-venv.sh \
+ && chmod 0644 /etc/profile.d/pt-venv.sh
+
+# Build probe: render a PDF through python3 exactly as a skill would, in each
+# shell form exec can take, with the PATH exec uses. The build fails if any
+# of them resolves a python3 without weasyprint.
+RUN probe="import yaml, weasyprint, sys; assert sys.version_info[:2] == (3, 13), sys.version; weasyprint.HTML(string='<p>build probe</p>').write_pdf('/tmp/probe.pdf'); import os; os.remove('/tmp/probe.pdf'); print('weasyprint', weasyprint.__version__, sys.executable)" \
+ && export PATH="/opt/plow/pt-venv/bin:$PATH" \
+ && sh -c "python3 -c \"$probe\"" \
+ && bash -c "python3 -c \"$probe\"" \
+ && bash -lc "python3 -c \"$probe\"" \
+ && env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin bash -lc "python3 -c \"$probe\""
+
 COPY boot /opt/plow/boot
 COPY plugin /opt/plow/plugin
 COPY prompt /opt/plow/prompt
