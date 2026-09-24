@@ -1,0 +1,149 @@
+{
+  "date": "2026-09-18",
+  "location": "Port Meridian",
+  "sections": [
+    {
+      "kind": "section",
+      "topic_id": "t_a100",
+      "title": "Weather",
+      "desk": "weather",
+      "body": "High clouds, a light breeze off the harbor.",
+      "forecast": [
+        {"day": "Fri", "date": "18/09", "icon": "partly-cloudy", "high": 19, "low": 12}
+      ],
+      "sources": ["https://example.com/weather/port-meridian"]
+    },
+    {
+      "kind": "section",
+      "topic_id": "t_a101",
+      "title": "What to prioritize today",
+      "desk": "priority",
+      "headline": "Finish the Friday loaf list before the market opens.",
+      "body": "Write the bakers' board, then walk the first tray.",
+    "priority": {
+      "recommendations": [
+        {
+          "headline": "Finish the Friday loaf list before the market opens",
+          "body": "Saturday's market still has no clear card for the rye, while the tasting flight is already drawing questions at the counter. Make the offer legible before adding another product: a customer who understands the loaf can choose it, describe it, and come back for it.",
+          "evidence": [
+            {
+              "claim": "The rye still lacks a market card",
+              "source": "Synthetic opening notes"
+            },
+            {
+              "claim": "Customers asked for the tasting flight in writing",
+              "source": "Synthetic counter notes"
+            }
+          ],
+          "first_step": "Write the rye card and pin it on the board by 09:00.",
+          "advisor": {
+            "name": "Patrick Salyer (Mayfield)",
+            "quote": "You'll know you're on the right track when you have a handful of referenceable customers ... and a \"painkiller\" solution.",
+            "url": "https://patricksalyer.substack.com/p/the-3-phases-of-enterprise-software"
+          }
+        },
+        {
+          "headline": "Turn the first tray walk into a repeatable quality check",
+          "body": "The morning tray walk is useful only if tomorrow's baker can repeat what Mira notices today. Capture the few observable signs that distinguish a ready loaf from one that needs another minute, then use the same check before every market batch.",
+          "evidence": [{"claim": "The first trays are reviewed with Mira", "source": "Synthetic calendar"}],
+          "first_step": "Write the three checks beside the oven before the 09:15 walk.",
+          "advisor": {"name": "Patrick Salyer (Mayfield)", "quote": "it's crucial for founders to be involved in establishing a sales playbook.", "url": "https://patricksalyer.substack.com/p/sales-playbook-what-is-it-and-how"}
+        },
+        {
+          "headline": "Let the tasting flight earn the next packaging spend",
+          "body": "Packaging is a use-of-funds decision; the tasting flight is the milestone that can justify it. Use this weekend to learn which pairing people understand and buy, then spend only against the presentation change that evidence unlocks.",
+          "evidence": [{"claim": "The tasting flight has active customer interest", "source": "Synthetic counter notes"}],
+          "first_step": "Prepare one tasting card with two pairings, one purchase question, and no packaging order.",
+          "advisor": {"name": "Patrick Salyer (Mayfield)", "quote": "Raise the right amount of money, at a stage appropriate valuation, to hit the milestones that unlock the next stage.", "url": "https://patricksalyer.substack.com/p/the-new-series-a-is-the-old-series"}
+        }
+      ],
+      "questions": []
+    },
+      "sources": []
+    },
+    {
+      "kind": "section",
+      "topic_id": "t_a102",
+      "title": "Calendar",
+      "desk": "calendar",
+      "headline": "Three stops, all before noon",
+      "body": "Mill, counter, then the market stall.",
+      "schedule": [
+        {"time": "08:30", "title": "Flour pickup at Harbor Mill", "icon": "task"},
+        {"time": "09:15", "title": "Walk the first trays", "icon": "meeting"},
+        {"time": "11:00", "title": "Call the stall about shade cloth", "icon": "call"},
+        {"time": "16:00", "title": "Proof tomorrow's dough", "icon": "reminder"}
+      ],
+      "sources": ["https://example.com/calendar"]
+    },
+    {
+      "kind": "section",
+      "topic_id": "t_a103",
+      "title": "Letters",
+      "desk": "mail",
+      "headline": "Four messages overnight",
+      "body": "The counter, the mill, and the market.",
+      "messages": [
+        {"sender": "Mira Vale", "subject": "Rye card copy — does this read right?"},
+        {"sender": "Harbor Mill", "subject": "Tomorrow's sack is ready at the dock"},
+        {"sender": "Kit Ellison", "subject": "Can we borrow the spare proofing box?"},
+        {"sender": "Port Market", "subject": "Stall 12 shade cloth is in"}
+      ],
+      "sources": ["https://example.com/mail"]
+    },
+    {
+      "kind": "section",
+      "topic_id": "t_a104",
+      "title": "Harbor league",
+      "desk": "sports",
+      "headline": "Otters take the midweek, Gulls on Saturday",
+      "body": "Two games on the strip this week.",
+      "games": [
+        {
+          "home": "Riverside Otters",
+          "away": "Cedar Foxes",
+          "status": "final",
+          "home_score": 3,
+          "away_score": 1
+        },
+        {
+          "home": "Harbor Gulls",
+          "away": "North Pier",
+          "status": "scheduled",
+          "time": "19:00"
+        }
+      ],
+      "sources": ["https://example.com/sports/harbor-league"]
+    },
+    {
+      "kind": "section",
+      "topic_id": "t_a105",
+      "title": "City opens the old ferry waiting room as a reading hall",
+      "desk": "news",
+      "tag": "City",
+      "headline": "Free tables, long hours, and a view of the channel",
+      "body": "Port Meridian converted the unused ferry waiting room into a public reading hall this week, with long tables facing the channel and hours that run past the last boat.\n\nThe city says the room had sat empty since the foot-ferry moved to the new pier. Volunteers stocked the shelves from two closing bookshops on Harbor Street.\n\nA Saturday morning paper hour is already on the board: bring a section, leave it for the next reader.",
+      "sources": ["https://example.com/news/ferry-reading-hall"]
+    },
+    {
+      "kind": "section",
+      "topic_id": "t_a106",
+      "title": "Mill workers vote to keep the night shift",
+      "desk": "news",
+      "tag": "Work",
+      "headline": "Harbor Mill stays on two ovens through winter",
+      "body": "Harbor Mill's night crew voted to keep the second shift through March, after a week of counting sacks against winter orders from the inner towns.\n\nThe mill posted the result on the dock board at dawn. Bakers on the strip said the extra bags are what Saturday's market has been short of since August.",
+      "sources": ["https://example.com/news/harbor-mill-shift"]
+    },
+    {
+      "kind": "section",
+      "topic_id": "t_a107",
+      "title": "Market adds an early bakers' gate",
+      "desk": "news",
+      "tag": "Customers",
+      "headline": "Saturday setup moves forward by half an hour",
+      "body": "Port Market will open the service gate to bakers at 06:30 on Saturday, thirty minutes earlier than last week.\n\nThe market coordinator said the change is a trial for the winter schedule. Stallholders must still clear the lane before the public gates open.",
+      "sources": ["https://example.com/news/market-bakers-gate"]
+    }
+  ]
+}
