@@ -41,6 +41,7 @@ Catalog — pick one, put it first, never invent another:
 | Asking about today's #1 / the file on their Mac | ⭐ |
 | Asking about mail | ✉️ |
 | Asking what news they want | 🗞️ |
+| Asking which signals to listen to | 👂 |
 | Paper queued, on its way; setup still working | ⏳ |
 
 `chat_status.py --busy` writes setup's ⏳ (hang-on, then "still on it" if

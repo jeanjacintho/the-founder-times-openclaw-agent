@@ -200,6 +200,28 @@ class TestInvariants:
         out, _ = run_gate({**VALID, "mail": {"configured": "yes"}}, tmp_path)
         assert "mail.configured is not a boolean" in out
 
+    def test_signals_absent_is_valid(self, tmp_path):
+        # An install from before signal sources existed: every source off.
+        out, _ = run_gate(VALID, tmp_path)
+        assert out == ""
+
+    def test_signals_switches_pass(self, tmp_path):
+        signals = {"group_chat": True, "email": False, "imessage": True}
+        out, _ = run_gate({**VALID, "signals": signals}, tmp_path)
+        assert out == ""
+
+    def test_signals_switch_must_be_boolean(self, tmp_path):
+        out, _ = run_gate({**VALID, "signals": {"group_chat": True, "email": "on", "imessage": False}}, tmp_path)
+        assert "signals.email is not a boolean" in out
+
+    def test_signals_unknown_source_is_refused(self, tmp_path):
+        out, _ = run_gate({**VALID, "signals": {"group_chat": True, "sms": True}}, tmp_path)
+        assert "signals.sms is not a signal source" in out
+
+    def test_signals_must_be_an_object(self, tmp_path):
+        out, _ = run_gate({**VALID, "signals": ["email"]}, tmp_path)
+        assert "signals is not an object" in out
+
     def test_priority_absent_is_valid(self, tmp_path):
         config = dict(VALID)
         config.pop("priority", None)

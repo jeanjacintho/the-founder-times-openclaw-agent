@@ -3,5 +3,6 @@
   "delivery": { "hour": "[DELIVERY_HOUR]", "lead_minutes": 150 },
   "printer": { "configured": false, "name": null },
   "priority": { "configured": true },
-  "mail": { "configured": false }
+  "mail": { "configured": false },
+  "signals": { "group_chat": false, "email": false, "imessage": false }
 }

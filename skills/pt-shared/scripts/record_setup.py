@@ -39,7 +39,7 @@ JSON off argv, so there is no `{`/`}`/inner-quote escaping to get wrong.
 Prints two lines on success:
 
     DRAFT:<comma-joined fields already recorded, or "none">
-    NEXT_QUESTION=<hour|printer|priority|mail|news|close>
+    NEXT_QUESTION=<hour|printer|priority|mail|news|signals|close>
 
 pt-setup's SKILL.md reads NEXT_QUESTION to decide what to ask -- never by
 re-deriving "what's next" from the draft's shape itself, and never from
@@ -64,7 +64,9 @@ from pt_paths import config_file  # noqa: E402
 DEFAULT_CONFIG = str(config_file())
 # The order pt-setup/SKILL.md's questions are asked in, plus the close step.
 # next_question() returns the first of these whose draft field is missing.
-QUESTION_ORDER = ("hour", "printer", "priority", "mail", "news")
+QUESTION_ORDER = ("hour", "printer", "priority", "mail", "news", "signals")
+# The priority-signal sources question 5 switches; all three must be recorded.
+SIGNAL_SOURCES = ("group_chat", "email", "imessage")
 
 
 def _coerce(raw_value):
@@ -127,6 +129,9 @@ def next_question(draft):
         return "mail"
     if not isinstance(draft.get("news_asked"), bool):
         return "news"
+    signals = draft.get("signals")
+    if not (isinstance(signals, dict) and all(isinstance(signals.get(s), bool) for s in SIGNAL_SOURCES)):
+        return "signals"
     return "close"
 
 
