@@ -53,12 +53,15 @@ test("provider and optional MCP use environment references, never credential val
   assert.equal(renderConfig(identity, "http://api:8000").mcp, undefined);
 });
 
-test("Opus 5 falls back to Sonnet on the Plow provider with explicit capacity and pricing", () => {
+test("GLM falls back to Sonnet, then Opus, on the Plow provider with explicit capacity and pricing", () => {
   const config = renderConfig(identity, "http://api:8000");
   assert.deepEqual(config.agents.defaults.model, {
-    primary: "plow/anthropic/claude-opus-5", fallbacks: ["plow/anthropic/claude-sonnet-5"],
+    primary: "plow/z-ai/glm-5.2", fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"],
   });
   assert.deepEqual(config.models.providers.plow.models, [{
+    id: "z-ai/glm-5.2", name: "GLM 5.2", input: ["text"], contextWindow: 1048576,
+    cost: { input: 0.5544, output: 1.7424 },
+  }, {
     id: "anthropic/claude-opus-5", name: "Claude Opus 5", input: ["text", "image"], contextWindow: 1000000,
     contextTokens: 400_000, cost: { input: 5.00, output: 25.00 },
   }, {

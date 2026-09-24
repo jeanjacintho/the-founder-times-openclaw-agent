@@ -935,8 +935,8 @@ class TestDeployment:
 
     def test_base_config_pins_the_paper_model_and_its_limits(self):
         config = (REPO / "boot" / "config.ts").read_text()
-        assert 'primary: "plow/anthropic/claude-opus-5"' in config
-        assert 'fallbacks: ["plow/anthropic/claude-sonnet-5"]' in config
+        assert 'primary: "plow/z-ai/glm-5.2"' in config
+        assert 'fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"]' in config
         assert "contextTokens: 400_000" in config
         assert 'pathPrepend: ["/opt/plow/pt-venv/bin"]' in config
         assert 'deny: ["ask_user", "secrets"]' in config
