@@ -2,3 +2,4 @@ plow-credentials
 node_modules/
 dist/
 docs/
+.maestri/
