@@ -24,6 +24,18 @@ export function isOwnerDm(chat: Chat, lineUid: string): boolean {
     chat.participants.some(p => p.type === "member" && p.role === "owner");
 }
 
+// The owner's phone DM as the hook itself sees it. The gateway runs the agent
+// turn from its ingress queue, outside the channel's dispatch, so this is the
+// signal a live turn carries: the plow chat account, the one session the
+// owner's DM is bound to, and a user turn (heartbeats and jobs are not).
+export const OWNER_DM_SESSION = "agent:main:main";
+export type HookContext = { channel?: string; accountId?: string; sessionKey?: string; trigger?: string };
+
+export function isOwnerDmTurn(ctx: HookContext | undefined): boolean {
+  return ctx?.channel === "plow" && (ctx.accountId ?? "chat") === "chat" &&
+    ctx.sessionKey === OWNER_DM_SESSION && (ctx.trigger === undefined || ctx.trigger === "user");
+}
+
 // SETUP_NEEDED + DRAFT: + LANG:, or READY + LANG:. Anything else is not the
 // gate's answer and must not be passed off as one.
 export function parseGate(stdout: string): string | undefined {

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { defineChannelPluginEntry, type ChannelPlugin, type PluginRuntime, type OpenClawConfig } from "openclaw/plugin-sdk/channel-core";
 import { loadWebMedia } from "openclaw/plugin-sdk/web-media";
 import { request, listen, accepts, ownerChat, HttpError, DeliveryUnknownError, type Account, type Chat, type Message, type TurnOutcome } from "./transport.ts";
-import { gateContext, isOwnerDm, runGate } from "./setup-gate.ts";
+import { gateContext, isOwnerDm, isOwnerDmTurn, runGate } from "./setup-gate.ts";
 
 let runtime: PluginRuntime;
 const activeTurn = new AsyncLocalStorage<{ chat: Chat; messageUid: string; account?: Account; deliveryUnknown?: boolean; replyDelivered?: boolean }>();
@@ -160,9 +160,10 @@ export default defineChannelPluginEntry({
   registerFull(api) {
     if (api.registrationMode === "full") api.logger.info("plow channel registered");
     // The owner's own phone DM starts from the newspaper's setup gate.
-    api.on("before_prompt_build", async () => {
+    api.on("before_prompt_build", async (_event, ctx) => {
       const turn = activeTurn.getStore();
-      if (!turn?.account || turn.account.accountId !== "chat" || !isOwnerDm(turn.chat, turn.account.lineUid)) return;
+      const inDispatch = Boolean(turn?.account && turn.account.accountId === "chat" && isOwnerDm(turn.chat, turn.account.lineUid));
+      if (!inDispatch && !isOwnerDmTurn(ctx)) return;
       const output = await runGate();
       return output ? { prependContext: gateContext(output) } : undefined;
     });
