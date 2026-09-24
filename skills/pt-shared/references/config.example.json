@@ -1,0 +1,7 @@
+{
+  "owner": { "timezone": "[OWNER_TZ]" },
+  "delivery": { "hour": "[DELIVERY_HOUR]", "lead_minutes": 150 },
+  "printer": { "configured": false, "name": null },
+  "priority": { "configured": true },
+  "mail": { "configured": false }
+}

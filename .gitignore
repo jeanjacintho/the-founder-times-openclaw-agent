@@ -3,3 +3,7 @@ node_modules/
 dist/
 docs/
 .maestri/
+checks/
+__pycache__/
+.pytest_cache/
+.claude/
