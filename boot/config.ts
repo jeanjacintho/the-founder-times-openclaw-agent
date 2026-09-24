@@ -26,6 +26,9 @@ export function renderConfig(identity: Identity, apiBase: string) {
     } } },
     agents: { entries: { main: { identity: { name } } }, defaults: {
       workspace: "/var/lib/plow/workspace", skipBootstrap: true,
+      // The paper's AGENTS.md plus up to 8,000 characters of Latch instructions is
+      // past OpenClaw's 20,000-character default; truncation drops its last rules.
+      bootstrapMaxChars: 40_000,
       model: { primary: "plow/z-ai/glm-5.2", fallbacks: ["plow/anthropic/claude-sonnet-5"] }, sandbox: { mode: "off" },
     } },
     ...(identity.mcp_url ? { mcp: { sessionIdleTtlMs: 300_000, servers: { plow: {
