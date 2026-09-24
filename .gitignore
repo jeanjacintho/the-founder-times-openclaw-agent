@@ -2,4 +2,7 @@ plow-credentials
 node_modules/
 dist/
 docs/
-.maestri/
+.maestri/checks/
+__pycache__/
+.pytest_cache/
+.claude/
