@@ -14,7 +14,8 @@
         "properties": {
           "apiBase": { "type": "string" },
           "lineUid": { "type": "string" },
-          "emailLineUid": { "type": "string" }
+          "emailLineUid": { "type": "string" },
+          "groups": { "type": "object" }
         }
       }
     }

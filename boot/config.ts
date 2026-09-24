@@ -49,10 +49,20 @@ export function renderConfig(identity: Identity, apiBase: string) {
     plugins: { load: { paths: ["/opt/plow/plugin"] }, entries: { plow: { enabled: true, hooks: { allowConversationAccess: true } } } },
     channels: { plow: {
       apiBase, lineUid: identity.line.uid,
+      // Groups are listen-only and anyone may join one, so in a group every
+      // sender -- the owner too -- gets exactly one tool: recording a signal.
+      // Any groups key turns on OpenClaw's group allowlist with mentions
+      // required; "*" admits every group and the agent hears every message.
+      groups: { "*": { requireMention: false, toolsBySender: { "*": { allow: ["plow_record_signal"] } } } },
       ...(email?.type === "agent" ? { emailLineUid: email.line.uid } : {}),
     } },
     session: { dmScope: "per-account-channel-peer", groupScope: "per-group" },
-    bindings: [{ agentId: "main", match: { channel: "plow", accountId: "chat", peer: { kind: "direct", id: "plow-owner" } }, session: { dmScope: "main" } }],
+    bindings: [
+      { agentId: "main", match: { channel: "plow", accountId: "chat", peer: { kind: "direct", id: "plow-owner" } }, session: { dmScope: "main" } },
+      // Every group text gets its own session; the default per-group key is what
+      // carries the group id OpenClaw resolves the group tool policy from.
+      { agentId: "main", match: { channel: "plow", accountId: "chat", peer: { kind: "group", id: "*" } } },
+    ],
     commands: { ownerAllowFrom: ["plow-owner"] },
     memory: { search: { rememberAcrossConversations: false } },
     // An empty allowlist means unrestricted in OpenClaw.

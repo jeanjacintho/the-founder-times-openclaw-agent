@@ -17,7 +17,8 @@ for (const trusted of [false, true]) for (const outcome of trusted ? ["delivered
   const controller = abortAfter();
   const account = { apiBase, accountId: "chat", lineUid: "line" };
   const sender = { type: "member", uid: "member", role: "member", display_name: "Member", provider_key: "+15550000001" };
-  const chat = { uid: "chat", status: "active", trusted, participants: [{ ...sender, uid: "owner", role: "owner", display_name: "Owner" }, sender, { type: "agent", relationship: "self", line: { uid: "line", provider_key: "+15550000002" } }] };
+  // A direct chat: a group with more than one person is listen-only (group-listen.test.ts).
+  const chat = { uid: "chat", status: "active", trusted, participants: [sender, { type: "agent", relationship: "self", line: { uid: "line", provider_key: "+15550000002" } }] };
   const fetch = t.mock.method(globalThis, "fetch", async (url: string, _init?: RequestInit) => Response.json(
     url.endsWith("/chats") ? { data: [chat], has_more: false } : url.endsWith("/chats/chat") || url.endsWith("/chats/other") ? chat :
     url.includes("/messages?") ? { data: [], has_more: false } : { ticket: "ticket", uid: "reply" }));
@@ -81,7 +82,6 @@ for (const trusted of [false, true]) for (const outcome of trusted ? ["delivered
   const facts = JSON.parse(JSON.stringify(factsEntry.payload));
   assert.equal(facts.trusted, trusted);
   assert.deepEqual(facts.participants, [
-    { name: "Owner", type: "member", role: "owner" },
     { name: "Member", type: "member", role: "member" },
     { type: "agent", role: "self" },
   ]);

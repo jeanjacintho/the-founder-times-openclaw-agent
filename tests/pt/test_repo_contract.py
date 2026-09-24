@@ -955,6 +955,27 @@ class TestDeployment:
             text = path.read_text(encoding="utf-8", errors="replace")
             assert not re.search(r"hermes", text, re.I), f"previous runtime named in {path.relative_to(REPO)}"
 
+    def test_build_compiles_every_boot_and_plugin_module(self):
+        # build.ts names each module it compiles for the image. A module left
+        # off the list ships as an import of a .js file that does not exist:
+        # tests on the host pass and the gateway fails to load the plugin.
+        import re
+
+        build = (REPO / "build.ts").read_text()
+        listed = set(re.findall(r'"((?:boot|plugin)/[A-Za-z0-9_-]+)"', build))
+        sources = {f"{p.parent.name}/{p.stem}" for p in [*REPO.glob("boot/*.ts"), *REPO.glob("plugin/*.ts")]}
+        assert sources, "no TypeScript sources found -- path wrong, test is vacuous"
+        assert sources - listed == set(), f"not compiled by build.ts: {sorted(sources - listed)}"
+
+    def test_channel_schema_admits_every_key_boot_writes(self):
+        # The plugin's channel schema is additionalProperties:false; a key the
+        # boot config writes under channels.plow that the schema does not name
+        # fails config validation and the gateway never starts.
+        manifest = json.loads((REPO / "plugin" / "openclaw.plugin.json").read_text())
+        properties = manifest["channelConfigs"]["plow"]["schema"]["properties"]
+        for key in ("apiBase", "lineUid", "emailLineUid", "groups"):
+            assert key in properties, key
+
     def test_base_config_pins_the_paper_model_and_its_limits(self):
         config = (REPO / "boot" / "config.ts").read_text()
         assert 'primary: "plow/z-ai/glm-5.2"' in config

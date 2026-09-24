@@ -24,6 +24,22 @@ test("only the owner's phone DM becomes main; other peers and groups stay isolat
   });
 });
 
+test("group chats get their own binding and only the signal tool, for everyone", () => {
+  const config = renderConfig(identity, "http://api:8000");
+  // No session override: the default per-group key carries the group id the
+  // tool policy is resolved from, and the owner's exact DM binding stays first.
+  assert.deepEqual(config.bindings[1], {
+    agentId: "main", match: { channel: "plow", accountId: "chat", peer: { kind: "group", id: "*" } },
+  });
+  assert.deepEqual(config.bindings[0].match.peer, { kind: "direct", id: "plow-owner" });
+  // Any groups key turns on OpenClaw's group allowlist with mentions required;
+  // "*" admits every group and the agent must hear every message.
+  assert.deepEqual(config.channels.plow.groups, { "*": {
+    requireMention: false,
+    toolsBySender: { "*": { allow: ["plow_record_signal"] } },
+  } });
+});
+
 test("mailbox and group chats cannot displace the owner's DM", () => {
   const config = renderConfig({ ...identity, chats: [...identity.chats,
     { uid: "cht_email", status: "active", participants: [
