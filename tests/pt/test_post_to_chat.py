@@ -19,6 +19,14 @@ MORNING = datetime(2026, 9, 19, 6, 4, tzinfo=ZoneInfo("America/Sao_Paulo"))
 AFTERNOON = datetime(2026, 9, 19, 14, 0, tzinfo=ZoneInfo("America/Sao_Paulo"))
 
 
+
+def owner_zone(monkeypatch, tmp_path, tz):
+    """--hold-until reads owner.timezone from PT_HOME's config.json."""
+    home = tmp_path / "pt-home"
+    home.mkdir(exist_ok=True)
+    (home / "config.json").write_text(json.dumps({"owner": {"timezone": tz}}))
+    monkeypatch.setenv("PT_HOME", str(home))
+
 class TestComposePayload:
     @pytest.mark.parametrize("text", ["Mail summary", ""])
     def test_pdf_body_carries_the_optional_companion(self, text):
@@ -293,19 +301,25 @@ class TestHoldUntil:
         ("America/New_York", datetime(2026, 11, 1, 1, 30), "03:00", 2.5 * 3600),
         ("UTC", datetime(2026, 9, 20, 7, 1), "07:00", 0),  # past: now, never tomorrow
     ])
-    def test_seconds_until_hour(self, monkeypatch, tz, now, hour, expected):
-        monkeypatch.setenv("TZ", tz)
+    def test_seconds_until_hour(self, monkeypatch, tmp_path, tz, now, hour, expected):
+        owner_zone(monkeypatch, tmp_path, tz)
         assert post.seconds_until_hhmm(hour, now=now.replace(tzinfo=ZoneInfo(tz))) == expected
 
     @pytest.mark.parametrize("now, expected", [
         (datetime(2026, 9, 20, 6, 59, 30), [30]),
         (datetime(2026, 9, 20, 8, 0, 0), []),  # already due: no sleep
     ])
-    def test_hold_sleeps_only_the_remaining_seconds(self, monkeypatch, now, expected):
-        monkeypatch.setenv("TZ", "UTC")
+    def test_hold_sleeps_only_the_remaining_seconds(self, monkeypatch, tmp_path, now, expected):
+        owner_zone(monkeypatch, tmp_path, "UTC")
         slept = []
         post.hold_until("07:00", sleep=slept.append, now=now.replace(tzinfo=ZoneInfo("UTC")))
         assert slept == expected
+
+    def test_the_owner_zone_wins_over_the_container_tz(self, monkeypatch, tmp_path):
+        owner_zone(monkeypatch, tmp_path, "America/Sao_Paulo")
+        monkeypatch.setenv("TZ", "Asia/Tokyo")
+        now = datetime(2026, 9, 20, 6, 20, tzinfo=ZoneInfo("America/Sao_Paulo"))
+        assert post.seconds_until_hhmm("07:00", now=now) == 40 * 60
 
     def test_bad_clock_is_refused(self):
         with pytest.raises(SystemExit, match="hold-until"):
