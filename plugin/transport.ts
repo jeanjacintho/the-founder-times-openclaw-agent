@@ -11,6 +11,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { on, once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import WebSocket from "ws";
+import { isListeningGroup } from "./group-listen.ts";
 
 export type Member = { type: "member"; uid: string; display_name: string; role: string; provider_key?: string };
 export type Agent = { type: "agent"; relationship: string; line: { uid: string; display_name?: string } };
@@ -151,8 +152,9 @@ export async function listen(account: Account, signal: AbortSignal, log: (text: 
           log(`turn aborted chat=${chat.uid} message=${message.uid}; left unacked`);
           return;
         }
-        notifyFailure = true;
-        log(`turn incomplete chat=${chat.uid} message=${message.uid}; acknowledging and notifying`);
+        // A listening group never hears from the agent, not even that a turn failed.
+        notifyFailure = !isListeningGroup(account, chat);
+        log(`turn incomplete chat=${chat.uid} message=${message.uid}; acknowledging${notifyFailure ? " and notifying" : " silently (listening group)"}`);
       }
     }
     if (account.accountId === "chat") await ack(chatUid, message.uid);

@@ -4,6 +4,7 @@ import { defineChannelPluginEntry, type ChannelPlugin, type PluginRuntime, type 
 import { loadWebMedia } from "openclaw/plugin-sdk/web-media";
 import { request, listen, accepts, ownerChat, HttpError, DeliveryUnknownError, type Account, type Chat, type Message, type TurnOutcome } from "./transport.ts";
 import { gateContext, isOwnerDm, isOwnerDmTurn, runGate } from "./setup-gate.ts";
+import { isListeningGroup } from "./group-listen.ts";
 
 let runtime: PluginRuntime;
 const activeTurn = new AsyncLocalStorage<{ chat: Chat; messageUid: string; account?: Account; deliveryUnknown?: boolean; replyDelivered?: boolean }>();
@@ -83,11 +84,13 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
     },
     media,
   });
-  log(`turn ${JSON.stringify({ chat: chat.uid, message: message.uid, first_contact: firstContact, senderId, senderName, senderIsOwner, sessionKey: route.sessionKey })}`);
+  // In a group the agent only listens: nothing it or the runtime produces is posted there.
+  const listening = isListeningGroup(account, chat);
+  log(`turn ${JSON.stringify({ chat: chat.uid, message: message.uid, first_contact: firstContact, senderId, senderName, senderIsOwner, sessionKey: route.sessionKey, listening })}`);
   return await activeTurn.run({ chat, messageUid: message.uid, account }, async () => {
     let failure: unknown;
     let completed = false;
-    if (account.accountId === "chat") await request(account, `/chats/${chat.uid}/typing`, { action: "start" }).catch(() => log("typing start failed"));
+    if (account.accountId === "chat" && !listening) await request(account, `/chats/${chat.uid}/typing`, { action: "start" }).catch(() => log("typing start failed"));
     try {
       const result = await runtime.channel.inbound.dispatch({
         cfg, channel: "plow", accountId: account.accountId, route, ctxPayload,
@@ -99,9 +102,13 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
               failure = new Error("Agent reply failed");
               return null;
             }
-            return failure || payload.isFallbackNotice ? null : payload;
+            return listening || failure || payload.isFallbackNotice ? null : payload;
           },
           deliver: async payload => {
+            if (listening) {
+              log(`suppressed group reply chat=${chat.uid}`);
+              return { messageIds: [] };
+            }
             const sent = await send(account, chat.uid, payload.text ?? "", payload.mediaUrls ?? (payload.mediaUrl ? [payload.mediaUrl] : []), true);
             log(`delivered chat=${chat.uid} message=${sent.messageId}`);
             return { messageIds: [sent.messageId] };
@@ -112,7 +119,7 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
       if (activeTurn.getStore()!.deliveryUnknown) throw new DeliveryUnknownError();
       if (failure) throw failure;
       if (!result.dispatched) throw new Error("Turn was not dispatched");
-      const outcome = completed && (activeTurn.getStore()!.replyDelivered || result.dispatchResult.deliberateSilentTerminalReply)
+      const outcome = completed && (listening || activeTurn.getStore()!.replyDelivered || result.dispatchResult.deliberateSilentTerminalReply)
         ? "completed" : "incomplete";
       log(`${outcome} chat=${chat.uid} message=${message.uid}`);
       return outcome;
@@ -120,7 +127,7 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
       if (activeTurn.getStore()!.deliveryUnknown) throw new DeliveryUnknownError();
       throw error;
     } finally {
-      if (account.accountId === "chat") await request(account, `/chats/${chat.uid}/typing`, { action: "stop" }).catch(() => log("typing stop failed"));
+      if (account.accountId === "chat" && !listening) await request(account, `/chats/${chat.uid}/typing`, { action: "stop" }).catch(() => log("typing stop failed"));
     }
   });
 }
