@@ -165,6 +165,9 @@ export default defineChannelPluginEntry({
       const inDispatch = Boolean(turn?.account && turn.account.accountId === "chat" && isOwnerDm(turn.chat, turn.account.lineUid));
       if (!inDispatch && !isOwnerDmTurn(ctx)) return;
       const output = await runGate();
+      // One line per owner turn: the trace keeps only the owner's own text, so
+      // this is how a live run shows the gate reached the prompt.
+      api.logger.info(output ? `plow setup gate prepended: ${output.split("\n")[0]}` : "plow setup gate unavailable; prompt fallback applies");
       return output ? { prependContext: gateContext(output) } : undefined;
     });
   },
