@@ -107,7 +107,7 @@ def main(argv=None, register_jobs=register):
     _write_json(dest / "topics.json", {"topics": topics})
     _write_json(dest / "config.json", config)
     print(f"imported: {dest / 'config.json'} (delivery {config['delivery']['hour']}, "
-          f"zone {config['owner']['timezone']}) and {len(topics)} topic(s)")
+          f"zone {config['owner']['timezone']}) and {len(topics)} topic(s)", flush=True)
     if args.no_register:
         return 0
     return register_jobs(args.previous_tz)
