@@ -57,6 +57,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from bearer_http import post_json, post_json_read, put_bytes, require
+from owner_chat import home_channel
 from owner_language import is_portuguese
 from owner_time import owner_now
 from pt_paths import config_file, pt_home
@@ -124,7 +125,7 @@ def hold_until(hhmm, sleep=time.sleep, now=None):
 def resolve_chat():
     """The chat endpoint (base + path) + bearer, validated before anything posts."""
     base = require("PLOW_API_BASE").rstrip("/")
-    uid = require("PLOW_HOME_CHANNEL")
+    uid = home_channel()
     token = require("PLOW_AGENT_TOKEN")
     return base, uid, token
 

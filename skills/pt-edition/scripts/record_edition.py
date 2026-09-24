@@ -43,7 +43,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "pt-shared" / "scripts"))
-from bearer_http import require
+from owner_chat import home_channel
 from latch_mcp import LatchError
 from owner_time import owner_now
 from pt_paths import pt_home
@@ -231,7 +231,7 @@ def main(argv=None):
     except ValueError as exc:
         sys.exit(f"error: --now {args.now!r} is not ISO8601 ({exc})")
     try:
-        print(record(connect(), args.edition_json, require("PLOW_HOME_CHANNEL"), now))
+        print(record(connect(), args.edition_json, home_channel(), now))
     except (LatchError, OSError, ValueError, KeyError, TypeError) as exc:
         sys.exit(f"error: edition not recorded — {exc}")
 

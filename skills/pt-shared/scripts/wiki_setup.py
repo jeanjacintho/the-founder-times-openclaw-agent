@@ -27,7 +27,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-from bearer_http import require
+from owner_chat import home_channel
 from latch_mcp import LatchError
 from wiki import GOALS, OVERVIEW, QA, RESOURCES, ROOT, SCHEMA, WIKI, WRITER, connect, join_page, split_page
 
@@ -75,7 +75,7 @@ def main(argv=None):
                         help="also the advisor's desk's pages (goals, the desk's Q&A)")
     args = parser.parse_args(argv)
     try:
-        did = ensure(connect(), require("PLOW_HOME_CHANNEL"), desk=args.desk)
+        did = ensure(connect(), home_channel(), desk=args.desk)
     except LatchError as exc:
         sys.exit(f"error: wiki not ready — {exc}")
     print("WIKI:" + ("ready" if not did else "set up " + ", ".join(did)))
