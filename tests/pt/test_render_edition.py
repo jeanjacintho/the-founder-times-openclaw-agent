@@ -386,11 +386,15 @@ class TestValidate:
         }])
         assert "priority is only valid on the priority desk" in render.validate(edition_data)
 
-    def test_priority_title_is_the_desk_title_not_python_text(self):
+    def test_priority_band_speaks_the_owners_language_not_python_english(self):
+        # The band is the paper's own heading (owner_phrases.py page.priority_band),
+        # fixed across editions and in the owner's language -- never English
+        # hardcoded for a Portuguese owner, never the desk's per-run title.
         data = recommendation_edition()
         data["sections"][0]["title"] = "O que devo priorizar hoje?"
-        html = render.render_html(data, render.DEFAULT_MASTHEAD, "{{PRIORITY_BLOCK}}")
-        assert "O que devo priorizar hoje?" in html
+        html = render.render_html(data, render.DEFAULT_MASTHEAD, "{{PRIORITY_BLOCK}}", language="Português")
+        assert "O que priorizar hoje" in html
+        assert "What to prioritize today" not in html
         assert "priority-wrap" in html
         assert "Put retention at the center" in html
 
@@ -1151,3 +1155,25 @@ class TestLabelsFollowTheOwnersLanguage:
         out = self._render(self._every_label_edition(), "")
         for english in ("FIRST STEP", "QUESTIONS FOR YOU", "Sources:", "Couldn't source", "Advice from", "Nothing to report this time."):
             assert english in out, english
+
+
+class TestPriorityBandIsFurniture:
+    """The priority band is masthead furniture, not model copy: two editions whose
+    desks titled themselves differently print the same heading."""
+
+    @staticmethod
+    def _heading(title, language):
+        page = recommendation_edition(questions=["Q2 — What changed?"])
+        page["sections"][0]["title"] = title
+        html = render.render_html(page, render.DEFAULT_MASTHEAD, "{{PRIORITY}}", language=language)
+        chat = render.render_chat(page, render.DEFAULT_MASTHEAD, language=language)
+        return html, chat
+
+    @pytest.mark.parametrize("language, band", [("", "What to prioritize today"), ("Português", "O que priorizar hoje")])
+    def test_the_band_heading_is_the_papers_not_the_models(self, tmp_path, monkeypatch, language, band):
+        monkeypatch.setenv("PT_HOME", str(tmp_path))
+        first = self._heading("FOUNDER FOCUS", language)
+        second = self._heading("What to prioritize today, maybe", language)
+        for html, chat in (first, second):
+            assert band in html and band in chat
+            assert "FOUNDER FOCUS" not in html + chat and "maybe" not in html + chat

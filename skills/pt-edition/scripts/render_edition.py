@@ -532,6 +532,15 @@ def _label(key, language):
     return phrase(f"page.{key}", language)
 
 
+def _band_title(section, desk, language):
+    """A section's heading. The priority band is the paper's furniture, like the
+    masthead: always page.priority_band, never the title the desk wrote, so it
+    reads the same every edition and whichever path produced the card."""
+    if desk == "priority":
+        return _label("priority_band", language)
+    return section["title"].strip()
+
+
 def _nothing_line(language):
     """The empty-section note: the label without its full stop, lower-cased
     first letter, in parentheses -- "(nothing to report this time)"."""
@@ -645,9 +654,9 @@ def source_markup(url, label=None):
 
 def chat_section(section, language=""):
     """One topic's block in the chat edition."""
-    title = section["title"].strip()
     tag = section.get("tag")
     desk = desk_of(section)
+    title = _band_title(section, desk, language)
     kicker = f"{desk} \u2014 " if desk != "news" else ""
     lines = [f"\u25b8 {kicker}{title}" + (f" \u2014 {tag}" if tag else "")]
     priority = section.get("priority") if desk == "priority" else None
@@ -1099,10 +1108,10 @@ def html_section(section, drop_cap=False, language=""):
     underneath). A real, explicit span floats correctly where the pseudo-
     element didn't.
     """
-    title = html.escape(section["title"].strip())
+    desk = desk_of(section)
+    title = html.escape(_band_title(section, desk, language), quote=False)
     headline = (section.get("headline") or "").strip()
     paras = body_paragraphs(section.get("body", ""))
-    desk = desk_of(section)
     tag = section.get("tag")
     # News stories wear the tag as a kicker above the headline; desks
     # keep it inline in the title bar.
