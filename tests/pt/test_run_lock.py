@@ -67,3 +67,19 @@ def test_release_missing_is_not_an_error(pt_home):
 def test_names_with_path_characters_refused(pt_home):
     with pytest.raises(SystemExit, match="not allowed"):
         lock.main(["acquire", "--name", "../escape"])
+
+
+def test_simultaneous_fires_elect_exactly_one_paper(pt_home):
+    # A scheduled fire and a manual `openclaw cron run` start separate
+    # processes at the same moment; exactly one may own the workspace.
+    import subprocess
+    import sys
+
+    from conftest import ROOT
+
+    script = ROOT / "pt-shared" / "scripts" / "run_lock.py"
+    argv = [sys.executable, str(script), "acquire", "--name", "paper-workspace-2026-09-24",
+            "--stale-minutes", "240"]
+    procs = [subprocess.Popen(argv, stdout=subprocess.PIPE, text=True) for _ in range(8)]
+    results = sorted(p.communicate()[0].strip() for p in procs)
+    assert results == ["acquired"] + ["held"] * 7
