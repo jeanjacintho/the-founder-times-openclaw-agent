@@ -87,7 +87,7 @@ plow-agents deploy REGISTRY/REPOSITORY@sha256:DIGEST --line LINE_UID
 
 A cloud host injects the credentials; there is no `plow-credentials` file.
 The image lists itself on the [Agent Index](https://aiworthusing.com/agent-index)
-as `theplowtimes` (`AGENT_ID`, `AGENT_NAME`, `AGENT_BLURB` in the Dockerfile)
+as `thefoundertimes` (`AGENT_ID`, `AGENT_NAME`, `AGENT_BLURB` in the Dockerfile)
 and reports its token usage through the base's pinned reporter.
 
 ## Your Mac: Latch, the printer and the wiki

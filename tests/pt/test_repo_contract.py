@@ -1005,7 +1005,7 @@ class TestDeployment:
         assert "ARG AGENTSVIEW_VERSION=0.44.0" in text
         assert "037ea7a46d52e06b20363b4aa7cd7f28e32f31d8215803d6e9a0c96bac5818e3" in text
         assert "6f3c76ebe119826a2def1ae226c3573b214d396a3ed7c477ef282b1063345b87" in text
-        assert "AGENT_ID=theplowtimes" in text
+        assert "AGENT_ID=thefoundertimes" in text
 
     def test_license_and_notice(self):
         assert (REPO / "LICENSE").read_text().startswith("MIT License")
