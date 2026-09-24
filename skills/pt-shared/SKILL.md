@@ -108,6 +108,14 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
   is reused); every other desk is cleared.
   It preserves topic workspaces, the live lock, and setup evidence. The wiki is delivered
   history; archived scratch is never today's completed work.
+- `scripts/signals.py` — the priority-signal contract (`source`, `from_name`,
+  `chat_or_thread_id`, `text`, `received_at`, `category`, `item`) and its
+  files under `pt/signals/`; imported, never run.
+- `scripts/signal_intake.py` — the ONLY way a signal is written. Called bare
+  with one record as JSON on stdin; prints one JSON line. Only
+  `category: priority` from a source switched on in `config.json` `signals`
+  becomes a file; spam, fyi, duplicates and empty text are refused with a
+  `reason`. Never write `pt/signals/` with the write or edit tools.
 - `references/config.example.json` — the config contract `pt_config_gate.py`
   enforces (including the optional `delivery.lead_minutes`, default 0, and
   optional `mail.configured`, default off)
