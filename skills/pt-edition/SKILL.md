@@ -267,7 +267,8 @@ this skill delivers it from that session like any other paper (no
    an empty body, the same envelope used for attachment-only sends.
 
    A **scheduled** paper's cron prompt adds `--hold-until HH:MM` (that job's
-   delivery hour). Honor it: the script sleeps until that clock in `TZ`, and
+   delivery hour). Honor it: the script sleeps until that clock in the owner's
+   zone (`owner.timezone`, the zone the job fires in), and
    if the hour has already passed it posts immediately (never until tomorrow).
    The on-demand copy's prompt carries none.
 
