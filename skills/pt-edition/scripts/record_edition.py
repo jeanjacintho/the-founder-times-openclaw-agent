@@ -149,6 +149,20 @@ def _section(section, notes):
     return lines + [""]
 
 
+def _notes_path(run_dir, topic_id):
+    """Where this topic's research notes are. pt-research writes them to
+    $PT_HOME/run/<topic_id>/notes.json; the edition file usually sits beside
+    them in run/<id>/, but a run that wrote it straight into run/ must not lose
+    the section's memory (measured 2026-09-24: printed [] for every news
+    section, so the next paper had no history to stay off)."""
+    for candidate in (run_dir.parent / topic_id / "notes.json",
+                      run_dir / topic_id / "notes.json",
+                      pt_home() / "run" / topic_id / "notes.json"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def _section_record(section, notes, prior):
     """This section's structural frontmatter entry: its latest headline and every
     sourced claim, merged with what an earlier edition the same day already recorded.
@@ -231,8 +245,8 @@ def record(wiki, edition_json, chat, now):
                 lines += _card(card)
                 urls += list(_card_urls(card))
             for section in news:
-                path = run_dir.parent / section["topic_id"] / "notes.json"
-                notes = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+                path = _notes_path(run_dir, section["topic_id"])
+                notes = json.loads(path.read_text(encoding="utf-8")) if path else {}
                 lines += _section(section, notes)
                 urls += [_url(note["url"]) for note in notes.get("notes") or []]
                 urls += [_url(u) for u in section.get("sources") or []]
