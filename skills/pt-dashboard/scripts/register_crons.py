@@ -109,6 +109,12 @@ STALE_RUN_MINUTES = 240
 # the day up: ~40 minutes, inside the hold-until window, each round under
 # OpenClaw's 30-minute exec timeout. The on-demand copy never waits.
 HELD_LOCK_WAIT_SECONDS = 1200
+# The priority desk's floor: with less than this left before delivery, a fresh
+# three-generation tournament cannot finish (measured ~35-50 min) before the
+# render and print still to follow. A delivery hour near midnight clamps the
+# lead below it and nothing refuses that, so the prompt states the window and
+# the desk writes its own reason instead of starting a tournament it cannot end.
+MIN_TOURNAMENT_MINUTES = 50
 
 # One topic's own edition: a subscription's nightly run or a one-off.
 TOPIC_PROMPT = (
@@ -159,7 +165,11 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
     lock = script("pt-shared", "run_lock.py")
     advice = (
         "reuse today's accepted checkpoint in run/desk-priority/tournament.json when "
-        "there is one, else run the tournament"
+        f"there is one, else run the tournament -- this job starts {lead_minutes} minutes "
+        f"before {hold_until} (delivery.lead_minutes, clamped so it never starts before "
+        f"midnight); once the lock is yours, run {script('pt-shared', 'owner_time.py')} "
+        f"minutes-until {hold_until} and, under {MIN_TOURNAMENT_MINUTES} minutes, write the "
+        f"desk's own unavailable reason per pt-priority/SKILL.md instead of starting one"
         if hold_until else
         "reuse the newest accepted checkpoint in run/desk-priority/tournament.json whatever "
         "its date -- an older one prints with \"as_of\" per pt-edition -- and run the "
