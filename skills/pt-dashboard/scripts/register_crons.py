@@ -104,6 +104,11 @@ DEFAULT_LEAD_MINUTES = 0
 # start and the held POST. Every paper shares the workspace lock, so a smaller
 # number could call the scheduled run dead and start a competing paper.
 STALE_RUN_MINUTES = 240
+# A scheduled paper that finds the workspace held (an on-demand copy runs its
+# whole ~35-minute paper under the lock) waits two rounds of this before giving
+# the day up: ~40 minutes, inside the hold-until window, each round under
+# OpenClaw's 30-minute exec timeout. The on-demand copy never waits.
+HELD_LOCK_WAIT_SECONDS = 1200
 
 # One topic's own edition: a subscription's nightly run or a one-off.
 TOPIC_PROMPT = (
@@ -160,11 +165,17 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
         "its date -- an older one prints with \"as_of\" per pt-edition -- and run the "
         "tournament only if none has ever been accepted"
     )
+    wait = f" --wait-seconds {HELD_LOCK_WAIT_SECONDS}" if hold_until else ""
+    held = (
+        "run the same acquire once more; if that is also 'held', another paper owns "
+        "the workspace -- stop"
+        if hold_until else "another paper owns the workspace -- stop"
+    )
     return (
         f"Run {title} now, in one session. First run {lock} acquire "
         f"--name {WORKSPACE_LOCK}-<today's date in the owner's "
-        f"zone> --stale-minutes {STALE_RUN_MINUTES + lead_minutes}; if its output is 'held', "
-        f"another paper owns the workspace -- stop. Then "
+        f"zone> --stale-minutes {STALE_RUN_MINUTES + lead_minutes}{wait}; if its output is 'held', "
+        f"{held}. Then "
         f"/opt/plow/skills/pt-shared/scripts/prepare_daily_run.py --preserve-priority "
         f"(it archives prior scratch after the lock; do not inspect or reuse old run files). Then "
         f"/opt/plow/skills/pt-intake/scripts/topics.py reopen-sections "

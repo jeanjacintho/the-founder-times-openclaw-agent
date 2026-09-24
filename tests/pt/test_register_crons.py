@@ -789,6 +789,26 @@ class TestScheduledHold:
         assert "--hold-until 12:00" in paper["prompt"]
         assert "--stale-minutes 240" in paper["prompt"]
 
+    def test_a_scheduled_paper_waits_out_a_fresh_holder_before_skipping(self):
+        # An on-demand paper ("manda o jornal agora") holds the same workspace
+        # lock for its whole run (~34 min measured live). A scheduled paper that
+        # fires meanwhile waits two 20-minute rounds -- each under OpenClaw's
+        # 30-minute exec timeout -- and only then gives the day up.
+        wait = f"--wait-seconds {crons.HELD_LOCK_WAIT_SECONDS}"
+        assert crons.HELD_LOCK_WAIT_SECONDS == 1200
+        jobs = crons.desired_jobs(
+            [topic("t_sec", kind="section", deliver_at="12:00")], "07:00", TZ, 150, extra_hours=["18:00"],
+        )
+        for job in jobs:
+            if job["name"].startswith(("pt-daily-edition", "pt-paper-")):
+                assert wait in job["prompt"], job["name"]
+                assert "run the same acquire once more" in job["prompt"], job["name"]
+
+    def test_the_on_demand_copy_never_waits_on_the_lock(self):
+        p = crons.paper_prompt(lead_minutes=150)
+        assert "--wait-seconds" not in p
+        assert "run the same acquire once more" not in p
+
     def test_extra_slot_holds_until_its_hour(self):
         jobs = crons.desired_jobs(
             [topic("t_1", kind="section")], "03:00", TZ, 45, extra_hours=["10:30"],

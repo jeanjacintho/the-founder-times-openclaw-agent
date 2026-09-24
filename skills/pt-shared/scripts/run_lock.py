@@ -10,7 +10,7 @@ agent must never do. The scheduler has no dedup, so the lock is a file
 created with O_EXCL: the atomic primitive every process on the host agrees
 on.
 
-  acquire --name NAME [--stale-minutes N]
+  acquire --name NAME [--stale-minutes N] [--wait-seconds N]
   release --name NAME
 
 `acquire` prints exactly one word and always exits 0, so a cron-fired
@@ -21,6 +21,13 @@ session reads the decision instead of a status code:
                   a dead run's leftover, not a live owner; this process now
                   owns it
   held            a fresh owner is running it; stop, do not start a second
+
+`--wait-seconds N` (default 0) makes a fresh `held` wait: acquire polls once
+a second -- re-checking staleness each time -- until the lock frees, goes
+stale, or N seconds pass, and only then answers `held`. A scheduled paper uses
+it so an on-demand copy holding the workspace does not cost it the day.
+Keep N under OpenClaw's 30-minute exec timeout: without the
+process tool, exec runs synchronously until then.
 
 `release` removes the lock; a missing lock is not an error (the run ended
 without acquiring, or two releases raced). The lock directory is
@@ -35,6 +42,7 @@ import os
 import pathlib
 import re
 import sys
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
@@ -86,7 +94,18 @@ def guarded(directory):
             fcntl.flock(guard, fcntl.LOCK_UN)
 
 
-def acquire(name, stale_minutes):
+def acquire(name, stale_minutes, wait_seconds=0):
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        outcome = _take(name, stale_minutes)
+        if outcome != "held" or time.monotonic() >= deadline:
+            print(outcome)
+            return 0
+        time.sleep(1)
+
+
+def _take(name, stale_minutes):
+    """One check-and-take under the host guard: acquired, stale-takeover or held."""
     path = lock_path(name)
     with guarded(path.parent):
         try:
@@ -102,14 +121,11 @@ def acquire(name, stale_minutes):
                 # is a dead run's leftover -- taking it over beats blocking the
                 # paper forever. A parsed-and-fresh lock is a live owner: held.
                 path.write_text(now().isoformat(timespec="seconds") + "\n")
-                print("stale-takeover")
-                return 0
-            print("held")
-            return 0
+                return "stale-takeover"
+            return "held"
         with os.fdopen(fd, "w") as handle:
             handle.write(now().isoformat(timespec="seconds") + "\n")
-    print("acquired")
-    return 0
+    return "acquired"
 
 
 def release(name):
@@ -123,6 +139,13 @@ def release(name):
     return 0
 
 
+def _seconds(raw):
+    value = int(raw)
+    if value < 0:
+        raise argparse.ArgumentTypeError("--wait-seconds cannot be negative")
+    return value
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -130,7 +153,8 @@ def main(argv=None):
     acq = sub.add_parser("acquire", help="take the run lock if free")
     acq.add_argument("--name", required=True)
     acq.add_argument("--stale-minutes", type=int, default=DEFAULT_STALE_MINUTES)
-    acq.set_defaults(func=lambda a: acquire(a.name, a.stale_minutes))
+    acq.add_argument("--wait-seconds", type=_seconds, default=0)
+    acq.set_defaults(func=lambda a: acquire(a.name, a.stale_minutes, a.wait_seconds))
 
     rel = sub.add_parser("release", help="drop the run lock")
     rel.add_argument("--name", required=True)
