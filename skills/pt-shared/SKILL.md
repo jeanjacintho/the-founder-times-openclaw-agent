@@ -83,7 +83,9 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
   work (one hang-on, then one "still on it", never a play-by-play). Cron never
   calls it.
 - `scripts/owner_time.py` — the owner's own clock, not the container's:
-  `owner_now()` (an aware datetime) and `owner_today()`, from `owner.timezone`
+  called bare as `owner_time.py minutes-until HH:MM` it prints the minutes left
+  until that time today (negative once passed; the priority desk's window check).
+  As a library, `owner_now()` (an aware datetime) and `owner_today()`, from `owner.timezone`
   in `pt/config.json`. Falls back to the container's clock only when the
   config or the key is absent; a config that exists but can't be trusted (bad
   JSON, an unreadable file, an unknown zone name) raises. Shared by

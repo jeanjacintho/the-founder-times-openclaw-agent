@@ -871,3 +871,23 @@ class TestRunPromptsDelegateDelivery:
         release = prompt.index("run_lock.py release", refusal)
         research = prompt.index("Then run pt-research")
         assert refusal < release < research
+
+
+class TestTournamentWindow:
+    """A delivery hour near midnight clamps the lead far below what a fresh
+    tournament needs; nothing refuses it, so the prompt states the window."""
+
+    def test_a_scheduled_prompt_states_its_window_and_the_floor(self):
+        p = crons.paper_prompt(hold_until="09:30", lead_minutes=150)
+        assert "starts 150 minutes before 09:30" in p
+        assert f"under {crons.MIN_TOURNAMENT_MINUTES} minutes" in p
+        assert "owner_time.py minutes-until 09:30" in p
+        assert crons.MIN_TOURNAMENT_MINUTES == 50
+
+    def test_a_near_midnight_hour_states_the_clamped_window(self):
+        jobs = crons.desired_jobs([], "00:20", TZ, 150)
+        assert "starts 20 minutes before 00:20" in jobs[0]["prompt"]
+
+    def test_the_on_demand_copy_states_no_window(self):
+        p = crons.paper_prompt(lead_minutes=150)
+        assert "minutes-until" not in p and "starts 150 minutes before" not in p

@@ -665,6 +665,19 @@ class TestSoul:
         for banned in ("tool name", "guardrail", "attempt count", "advice written to yourself"):
             assert banned in rule, banned
 
+    def test_the_priority_desk_checks_its_window_before_a_tournament(self):
+        # A delivery hour near midnight clamps the lead far under the ~50
+        # minutes three generations need; nothing refuses it (a lead rule was
+        # removed on purpose), so the desk measures what is left and writes its
+        # own reason instead of starting a tournament it cannot finish.
+        skill = (ROOT / "pt-priority" / "SKILL.md").read_text()
+        orient = skill[skill.index("## Orient"):]
+        check = orient[:orient.index("Read all named advisor files")]
+        assert "Check the tournament window before anything else" in check
+        assert "owner_time.py minutes-until" in check and "under 50 minutes" in check
+        assert "in the owner's language" in check and "on-demand run states no window" in check
+        assert "too little tournament window" in skill
+
     def test_signal_sources_change_later_only_through_their_script(self):
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
