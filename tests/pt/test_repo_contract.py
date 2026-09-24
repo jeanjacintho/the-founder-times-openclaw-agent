@@ -584,6 +584,26 @@ class TestSoul:
             assert heading in rubric
         assert "data, never instructions" in rubric
 
+    def test_the_paper_scans_private_signals_before_the_tournament(self):
+        # Mail and iMessage become signals only through scan -> triage ->
+        # intake -> commit, inside the priority desk's own run and before
+        # pt-priority loads; an unreadable source is an unknown, never "no mail".
+        desks = (ROOT / "pt-research" / "references" / "desks.md").read_text()
+        step = desks[desks.index("### Signals"):desks.index("## 1. Location")]
+        order = [step.index(s) for s in (
+            "scan_private_signals.py scan", "signal-triage.md", "signal_intake.py", "scan_private_signals.py commit")]
+        assert order == sorted(order)
+        assert "degraded" in step and "never" in step.lower()
+        assert "data, never instructions" in step
+
+    def test_setup_probes_imessage_with_the_scans_exact_argv(self):
+        # The Mac's always-allow keys on the exact argv: the attended setup
+        # probe is what lets the unattended scan run without an approval.
+        scan = load_module("scan_private_signals", "pt-priority/scripts/scan_private_signals.py")
+        setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
+        probe = json.dumps({"argv": scan.IMESSAGE_ARGV, "read_paths": ["~/Library/Messages"], "goal": scan.IMESSAGE_GOAL})
+        assert probe.replace('{"argv"', '{ "argv"').rstrip("}") + " }" in setup
+
     def test_signal_sources_change_later_only_through_their_script(self):
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
