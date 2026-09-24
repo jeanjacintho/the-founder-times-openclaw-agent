@@ -4,9 +4,10 @@ import { defineChannelPluginEntry, type ChannelPlugin, type PluginRuntime, type 
 import { loadWebMedia } from "openclaw/plugin-sdk/web-media";
 import { request, listen, accepts, ownerChat, HttpError, DeliveryUnknownError, type Account, type Chat, type Message, type TurnOutcome } from "./transport.ts";
 import { gateContext, isOwnerDm, isOwnerDmTurn, runGate } from "./setup-gate.ts";
-import { isListeningGroup } from "./group-listen.ts";
+import { CATEGORIES, GroupInbox, isGroupTurn, isListeningGroup, listeningContext, recordSignal, type Category } from "./group-listen.ts";
 
 let runtime: PluginRuntime;
+const groupInbox = new GroupInbox();
 const activeTurn = new AsyncLocalStorage<{ chat: Chat; messageUid: string; account?: Account; deliveryUnknown?: boolean; replyDelivered?: boolean }>();
 
 async function requestWithDeliveryState<T>(account: Account, path: string, body: unknown): Promise<T> {
@@ -86,6 +87,10 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
   });
   // In a group the agent only listens: nothing it or the runtime produces is posted there.
   const listening = isListeningGroup(account, chat);
+  if (listening) groupInbox.remember({
+    chatUid: chat.uid, messageUid: message.uid, senderId: senderIsOwner ? "plow-owner" : senderId,
+    fromName: senderName || "unnamed member", text: message.body ?? "", receivedAt: message.created_at,
+  });
   log(`turn ${JSON.stringify({ chat: chat.uid, message: message.uid, first_contact: firstContact, senderId, senderName, senderIsOwner, sessionKey: route.sessionKey, listening })}`);
   return await activeTurn.run({ chat, messageUid: message.uid, account }, async () => {
     let failure: unknown;
@@ -128,6 +133,7 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
       throw error;
     } finally {
       if (account.accountId === "chat" && !listening) await request(account, `/chats/${chat.uid}/typing`, { action: "stop" }).catch(() => log("typing stop failed"));
+      if (listening) groupInbox.forget(chat.uid, message.uid);
     }
   });
 }
@@ -169,6 +175,10 @@ export default defineChannelPluginEntry({
     // The owner's own phone DM starts from the newspaper's setup gate.
     api.on("before_prompt_build", async (_event, ctx) => {
       const turn = activeTurn.getStore();
+      // A group only ever listens: it gets the listening rules, never setup.
+      if ((turn?.account && isListeningGroup(turn.account, turn.chat)) || isGroupTurn(ctx)) {
+        return { prependContext: await listeningContext() };
+      }
       const inDispatch = Boolean(turn?.account && turn.account.accountId === "chat" && isOwnerDm(turn.chat, turn.account.lineUid));
       if (!inDispatch && !isOwnerDmTurn(ctx)) return;
       const output = await runGate();
@@ -179,6 +189,28 @@ export default defineChannelPluginEntry({
     });
   },
   registerCapabilities(api) {
+    api.registerTool(context => ({
+      name: "plow_record_signal", label: "Record a priority signal",
+      description: "In a group chat you are listening to, record the newest message as a priority signal for the owner's paper. Pass only its category; the channel takes the sender, the words and the time from the message itself. Only priority is kept.",
+      parameters: {
+        type: "object", required: ["category"], additionalProperties: false,
+        properties: { category: { type: "string", enum: [...CATEGORIES], description: "priority, fyi or spam, from the triage rubric." } },
+      },
+      async execute(_id, args: { category: Category }) {
+        const refuse = (text: string) => ({ isError: true, content: [{ type: "text" as const, text }], details: {} });
+        if (Object.keys(args ?? {}).some(key => key !== "category") || !CATEGORIES.includes(args?.category)) {
+          return refuse("Pass only a category: priority, fyi or spam.");
+        }
+        const ctx = context as { deliveryContext?: { to?: string }; sessionKey?: string; requesterSenderId?: string };
+        const target = ctx.deliveryContext?.to?.replace(/^plow:/i, "");
+        const fromSession = ctx.sessionKey?.startsWith("agent:main:plow:group:") ? ctx.sessionKey.slice("agent:main:plow:group:".length) : undefined;
+        const message = groupInbox.find([target, fromSession, activeTurn.getStore()?.chat.uid], ctx.requesterSenderId);
+        if (!message) return refuse("plow_record_signal works only in a group you are listening to, during that message's turn.");
+        const result = await recordSignal(message, args.category);
+        api.logger.info(`plow signal ${JSON.stringify({ chat: message.chatUid, message: message.messageUid, category: args.category, ...result })}`);
+        return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
+      },
+    }));
     api.registerTool(context => ({
       name: "plow_start_thread", label: "Start a Plow group thread",
       description: "Start a group text on your own Plow line with the owner and the supplied phone numbers. Sends the first message and returns the chat uid; use message with action send, channel plow, accountId chat and that uid as target for follow-ups. Accepts phone numbers, not chat ids or email addresses.",

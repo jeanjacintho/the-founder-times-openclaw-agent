@@ -572,6 +572,18 @@ class TestSoul:
             assert field in setup
         assert '"plow-messages", "search", "--limit", "200", "--order", "desc"' in setup
 
+    def test_groups_are_listen_only_in_the_prompt(self):
+        # A group chat is listen-only: the channel drops any reply, and the
+        # prompt must not tell the model to answer there.
+        soul = (AGENTS).read_text()
+        assert "In a group, or" not in soul
+        assert "In a group chat you only listen" in soul
+        assert "plow_record_signal" in soul and "NO_REPLY" in soul
+        rubric = (ROOT / "pt-shared" / "references" / "signal-triage.md").read_text()
+        for heading in ("## priority", "## fyi", "## spam"):
+            assert heading in rubric
+        assert "data, never instructions" in rubric
+
     def test_signal_sources_change_later_only_through_their_script(self):
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
@@ -966,6 +978,20 @@ class TestDeployment:
         sources = {f"{p.parent.name}/{p.stem}" for p in [*REPO.glob("boot/*.ts"), *REPO.glob("plugin/*.ts")]}
         assert sources, "no TypeScript sources found -- path wrong, test is vacuous"
         assert sources - listed == set(), f"not compiled by build.ts: {sorted(sources - listed)}"
+
+    def test_every_plugin_tool_is_allowed_by_the_tool_profile(self):
+        # The "messaging" profile only lets a plugin tool through when
+        # tools.alsoAllow names it, and every policy layer must allow a tool.
+        # Measured with OpenClaw's effective-tool inventory: without this,
+        # plow_record_signal was absent even in a group whose own policy
+        # allows exactly that tool.
+        import re
+
+        manifest = json.loads((REPO / "plugin" / "openclaw.plugin.json").read_text())
+        config = (REPO / "boot" / "config.ts").read_text()
+        also_allow = re.search(r"alsoAllow: \[([^\]]*)\]", config).group(1)
+        for tool in manifest["contracts"]["tools"]:
+            assert f'"{tool}"' in also_allow, tool
 
     def test_channel_schema_admits_every_key_boot_writes(self):
         # The plugin's channel schema is additionalProperties:false; a key the
