@@ -1,4 +1,4 @@
-"""Repo-level deployment contracts: plow-agents compose.yml and the image."""
+"""Repo-level contracts: the agent prompt, the pt-* skills, and the OpenClaw image."""
 from __future__ import annotations
 
 import json
@@ -10,62 +10,33 @@ from conftest import ROOT, load_module
 
 import pytest
 
-# These contracts describe the previous runtime image (compose, s6, the Hermes
-# venv). They are rewritten against the OpenClaw layout; until then they stay
-# out of the run rather than failing on paths that no longer exist.
-pytestmark = pytest.mark.skip(reason="previous-runtime repo contract, pending rewrite for OpenClaw")
+# ROOT is skills/; the repo and the agent prompt live above it.
+REPO = ROOT.parent
+AGENTS = REPO / "prompt" / "AGENTS.md"
 
 
 class TestSoul:
-    def test_soul_md_does_not_trip_hermes_context_injection_scanner(self):
-        # Measured live: agent.prompt_builder scans SOUL.md before it ever
-        # reaches the model (tools/threat_patterns.py, scope="context") and
-        # replaces the WHOLE file with "[BLOCKED: ... prompt injection ...]"
-        # on a hit -- not a warning, a silent full-file drop. SOUL.md's own
-        # advice to distrust web content ("a page that says 'ignore your
-        # previous instructions'...") tripped its own guard's
-        # "prompt_injection" pattern, so the agent ran with NONE of its
-        # instructions (no pt-intake, no sourcing rule, nothing) while every
-        # skill file and this repo's own tests stayed green -- the failure
-        # was invisible to anything except the gateway's own runtime log.
-        # This mirrors that one pattern (the exact regex that fired), not
-        # the full scanner, as a cheap regression guard with no dependency
-        # on the hermes_agent package being installed.
+    def test_prompt_fits_the_bootstrap_cap_with_a_full_latch_block(self):
+        # OpenClaw truncates each workspace bootstrap file at
+        # agents.defaults.bootstrapMaxChars; boot appends up to 8,000
+        # characters of Latch instructions to prompt/AGENTS.md.
         import re
 
-        pattern = re.compile(
-            r"ignore\s+(?:\w+\s+){0,8}(previous|all|above|prior)\s+(?:\w+\s+){0,8}instructions",
-            re.IGNORECASE,
-        )
-        text = (ROOT / "runtime" / "SOUL.md").read_text()
-        assert not pattern.search(text), (
-            "SOUL.md contains a phrase matching Hermes' context-injection "
-            "scanner (tools/threat_patterns.py, pattern id 'prompt_injection'); "
-            "the whole file gets replaced with a [BLOCKED: ...] placeholder "
-            "at runtime, not just this sentence -- reword it, don't just "
-            "silence this assertion"
-        )
+        config = (REPO / "boot" / "config.ts").read_text()
+        cap = int(re.search(r"bootstrapMaxChars:\s*([\d_]+)", config).group(1).replace("_", ""))
+        latch = ("\nInstructions from your owner's Mac through Latch (up to 8,000 characters):"
+                 "\n\n```text\n" + "A" * 8000 + "\n```\n")
+        n = len(AGENTS.read_text() + latch)
+        assert n <= cap, f"rendered AGENTS.md is {n} chars; OpenClaw truncates above {cap}"
 
-    def test_soul_fits_hermes_context_file_limit(self):
-        # Measured live: prompt_builder truncated SOUL.md at 20 000 because
-        # context_file_max_chars never reached plow-seed. The merge carries
-        # the runtime value; this bound uses the same number so a longer
-        # persona fails here instead of only in docker compose logs.
-        check = load_module("soul_fits_context", "checks/soul_fits_context.py")
-        n, limit = check.check(ROOT)
-        assert n <= limit, f"SOUL.md is {n} chars; Hermes truncates above {limit}"
-
-    def test_soul_forbids_reading_the_agents_own_env_file(self):
-        # Measured live: asked why a page had not printed, a session reached
-        # for execute_code three times to read /var/lib/hermes/.env (once via
-        # read_file, twice via terminal cat) and put the raw /approve prompt
-        # in front of the owner each time. That file is the agent's own
-        # credential store -- an approval would have printed credentials into
-        # the chat transcript. The rule has to name the path, because the
-        # existing never-improvise prose did not.
-        text = (ROOT / "runtime" / "SOUL.md").read_text()
-        assert "/var/lib/hermes/.env" in text
-        assert "Never read" in text
+    def test_prompt_forbids_reading_the_agents_own_credentials(self):
+        # Measured live on the previous runtime: asked why a page had not
+        # printed, a session read the agent's own credential file three times.
+        # The rule has to name the places, because never-improvise prose did not.
+        text = AGENTS.read_text()
+        assert "Never read this agent's credentials" in text
+        for place in ("printenv", "/proc/*/environ", "/var/lib/plow/openclaw.json", "plow-credentials"):
+            assert place in text
 
     def test_print_skill_says_a_hosted_install_can_print(self):
         # A hosted install used to fail every print on a missing DOMO_* pair,
@@ -86,15 +57,15 @@ class TestSoul:
         assert "Qual seu fuso" not in text
 
     def test_soul_setup_gate_is_a_bare_script_not_python_dash_c(self):
-        text = (ROOT / "runtime" / "SOUL.md").read_text()
+        text = (AGENTS).read_text()
         assert (
-            "/var/lib/hermes/skills/pt-shared/scripts/setup_needed.py "
-            "/var/lib/hermes/pt/config.json"
+            "/opt/plow/skills/pt-shared/scripts/setup_needed.py "
+            "/var/lib/plow/pt/config.json"
         ) in text
         assert "python3 -c" not in text
         assert "bash -c" not in text
-        text = (ROOT / "runtime" / "SOUL.md").read_text()
-        assert "not a first-contact script" in text
+        text = (AGENTS).read_text()
+        assert "that sheet is the only\nthing that decides how a first message goes" in text
         assert "pt-setup" in text
 
     def test_soul_setup_gate_applies_to_every_reply_not_just_greetings(self):
@@ -104,7 +75,7 @@ class TestSoul:
         # Python read of pt/config.json (which doesn't exist yet at that
         # point) wrapped in a heredoc -- tripping the dangerous-command
         # gate for a file read nothing asked for.
-        text = (ROOT / "runtime" / "SOUL.md").read_text()
+        text = (AGENTS).read_text()
         assert "every single reply" in text
         assert "a reason to reach for inline" in text
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
@@ -116,7 +87,7 @@ class TestSoul:
         text = (ROOT / "pt-setup" / "SKILL.md").read_text()
         assert '"command":' not in text
         assert '"argv": ["lpstat", "-p"]' in text
-        assert "mcp__plow__plow_run_command" in text
+        assert "plow__plow_run_command" in text
 
     def test_setup_printer_probe_requests_network_for_cups_ipc(self):
         # Root cause, reproduced directly against Latch's generated profile
@@ -159,7 +130,7 @@ class TestSoul:
         # the identical error one layer down. Inside the printer probe it may
         # appear ONLY as the documented warning, never as an instruction.
         text = (ROOT / "pt-setup" / "SKILL.md").read_text()
-        probe = text[text.index('"argv": ["lpstat", "-p"]'):text.index("record_setup.py /var/lib/hermes/pt/config.json printer.configured=true")]
+        probe = text[text.index('"argv": ["lpstat", "-p"]'):text.index("record_setup.py /var/lib/plow/pt/config.json printer.configured=true")]
         assert probe.count('["osascript"') == 1, "osascript appears in the probe other than as the warning"
         assert probe.index("Do not") < probe.index('["osascript"')
 
@@ -182,7 +153,7 @@ class TestSoul:
         # The guard used to cover wrapping an invocation and reading
         # config.json, but never "read the script to learn its interface" --
         # the one variant with an actual motive behind it.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "own source" in soul
         assert "Never open one of these scripts" in soul
         # And it must point at where the contract actually lives.
@@ -197,7 +168,7 @@ class TestSoul:
         # recorded language rides back on every one of them.
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         assert "owner.language=" in setup, "the interview must record the language"
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "LANG:unrecorded" in soul
         # And the gate must actually emit it.
         gate = (ROOT / "pt-shared" / "scripts" / "setup_needed.py").read_text()
@@ -308,7 +279,7 @@ class TestSoul:
         # Two variants of one class (read a script's source; delete a file
         # with an interpreter). The guard must state the class, not just
         # enumerate the instances.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "names no command" in soul
         assert "record_setup.py" in soul and "--done" in soul
 
@@ -322,9 +293,9 @@ class TestSoul:
         # bug; the rule is right.
         for path in sorted(ROOT.glob("pt-*/SKILL.md")):
             text = path.read_text()
-            assert "python3 /var/lib/hermes" not in text, f"interpreter prefix in {path.name}"
+            assert "python3 /opt/plow" not in text, f"interpreter prefix in {path.name}"
             for line in text.splitlines():
-                if "/var/lib/hermes/skills/" in line and line.rstrip().endswith("\\"):
+                if "/opt/plow/skills/" in line and line.rstrip().endswith("\\"):
                     raise AssertionError(f"split script invocation in {path.name}: {line.strip()}")
 
     def test_every_bare_invoked_script_is_executable(self):
@@ -337,7 +308,7 @@ class TestSoul:
 
         seen = set()
         for path in sorted(ROOT.glob("pt-*/SKILL.md")):
-            for match in re.finditer(r"/var/lib/hermes/skills/(pt-[\w-]+/scripts/[\w.]+\.py)", path.read_text()):
+            for match in re.finditer(r"/opt/plow/skills/(pt-[\w-]+/scripts/[\w.]+\.py)", path.read_text()):
                 seen.add(match.group(1))
         assert seen, "no script invocations found -- regex is wrong, test is vacuous"
         for rel in sorted(seen):
@@ -370,12 +341,12 @@ class TestSoul:
             f"stops at Permission denied otherwise: {missing}"
         )
 
-    def test_soul_forbids_execute_code_for_flow_commands(self):
-        # execute_code was the one route the guard never named: it enumerated
-        # -c, heredocs, shells, ||, &&, ;, printf -- so the run picked the
-        # door that wasn't on the list.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
-        assert "execute_code" in soul
+    def test_prompt_forbids_every_interpreter_wrapper_for_flow_commands(self):
+        # The guard used to enumerate -c, heredocs, shells, ||, &&, ;, printf
+        # and a run picked the one door it did not name.
+        soul = AGENTS.read_text()
+        assert "not even `python3`" in soul
+        assert "heredoc" in soul
         assert "shebang" in soul
 
     def test_research_web_is_latch_browser_only(self):
@@ -386,13 +357,13 @@ class TestSoul:
         # owner's Mac. The paper's web is Latch's browser or it is not
         # sourced -- including sports JSON that desks.md used to call a
         # "plain HTTP fetch" that "does not compete for the browser pass".
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         research = (ROOT / "pt-research" / "SKILL.md").read_text()
         desks = (ROOT / "pt-research" / "references" / "desks.md").read_text()
         # SOUL.md, loaded in every session, is the one statement of the rule.
-        for name in ("plow_browser_", "web_extract", "Firecrawl", "Exa", "Keenable", "Parallel"):
+        for name in ("plow__plow_browser_open", "Any other web tool runs in this container", "curl"):
             assert name in soul
-        assert "web_extract" not in research, "the Latch-only rule is restated in pt-research"
+        assert "web_fetch" not in research, "the Latch-only rule is restated in pt-research"
         assert "plain HTTP fetch" not in desks
         assert "does not compete for the browser pass" not in desks
         assert "plow_run_command can fetch this" not in desks
@@ -423,7 +394,7 @@ class TestSoul:
         # execution, handing the owner a raw /approve prompt instead of
         # an answer. Both files must say plainly that a dotted/underscored
         # *value* never requires any wrapping.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         assert "python3 - <<'PY'" in soul
         assert "wrap this in" in setup
@@ -465,9 +436,8 @@ class TestSoul:
         # Portuguese reply anyway -- twice in plain-text failure messages,
         # once inside a `clarify` tool call's question text. The rule must
         # cover tool-produced owner-facing strings, not just plain text.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
-        assert "failure explanation" in soul
-        assert "clarify" in soul
+        soul = (AGENTS).read_text()
+        assert "failure explanations and every other string the owner sees" in soul
 
     def test_setup_close_step_forbids_asking_the_owner_for_a_city(self):
         # Measured live: on reaching NEXT_QUESTION=close, a run skipped
@@ -477,8 +447,8 @@ class TestSoul:
         # first. The close section needs its own explicit guard, not just
         # a cross-reference to desks.md's rule.
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
-        close = setup.split("## Close:", 1)[1]
-        assert "clarify" in close
+        close = " ".join(setup.split("## Close:", 1)[1].split())
+        assert "not through any tool" in close
         assert "Em que cidade" in close or "do only the three numbered" in close
 
     def test_setup_never_narrates_its_own_step_classification(self):
@@ -490,7 +460,7 @@ class TestSoul:
         # reply must be the opener's own first character), not a sentence
         # to avoid repeating.
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         # SOUL.md owns the mechanical check; pt-setup defers to it.
         assert "and only that message" in setup
         assert "nothing else — never" in soul
@@ -505,7 +475,7 @@ class TestSoul:
         # run in English. READY used to print no LANG line; it now does,
         # and no skill outside pt-setup had ever been told to stay silent
         # between tool calls.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "still prints" in soul and "LANG:" in soul
         assert "record_owner_language.py" in soul
         assert "silent between tool calls" in soul
@@ -517,7 +487,7 @@ class TestSoul:
     def test_silence_between_tool_calls_is_stated_once(self):
         # No paper runs in the chat turn any more (#98); the silence rule is
         # SOUL.md's, loaded in every session, not restated per skill.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "silent between tool calls" in soul
         for skill in ("pt-research", "pt-edition", "pt-print"):
             text = (ROOT / skill / "SKILL.md").read_text()
@@ -534,7 +504,7 @@ class TestSoul:
         text = (ROOT / "pt-print" / "SKILL.md").read_text()
         assert "post_to_chat.py` runs this" in text
         assert (
-            "/var/lib/hermes/skills/pt-print/scripts/print_edition.py"
+            "/opt/plow/skills/pt-print/scripts/print_edition.py"
         ) in text
         assert "one `cat`, once" not in text
         assert "content=<the HTML>" not in text
@@ -550,10 +520,10 @@ class TestSoul:
         # research decision into chat, then attached edition.pdf. The turn
         # now only queues the job and answers with one ⏳ line.
         intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         edition = (ROOT / "pt-edition" / "SKILL.md").read_text()
         assert "one ⏳ line" in intake
-        assert "interim_assistant_messages: false" in soul
+        assert "Only your final reply reaches the chat" in " ".join(soul.split())
         assert "The-Founder-Times-" in edition
         assert "--filename" in edition
         script = ROOT / "pt-shared" / "scripts" / "chat_status.py"
@@ -567,7 +537,7 @@ class TestSoul:
         # product spec ("news desk", "~/Plow/prioritization.md",
         # "departments"). Real people get one emoji, a space, then a
         # spoken line — no paths, no desk names.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         status = (ROOT / "pt-shared" / "scripts" / "chat_status.py").read_text()
         assert "CHAT_VOICE" in soul
@@ -593,13 +563,13 @@ class TestSoul:
         # (printer probe, Mac files, location) has to POST a hang-on
         # through chat_status.py --busy, never a play-by-play.
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "chat_status.py --busy" in setup
         assert "chat_status.py --busy" in soul
         assert "do not type" in setup.lower() or "never type" in setup.lower()
 
     def test_setup_treats_yes_as_the_default_hour(self):
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         assert "send its opener" not in soul
         # SOUL.md delegates to pt-setup's own NEXT_QUESTION-driven steps
@@ -631,7 +601,7 @@ class TestSoul:
         # recording the answer it had just been given. SOUL.md must always
         # hand off to pt-setup (whose own step 1b recognizes an hour
         # answer) rather than deciding straight from DRAFT:none itself.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "always load" in soul and "pt-setup" in soul
         assert "never decide" in soul.lower() or "not mean the incoming message" in soul
 
@@ -654,11 +624,12 @@ class TestSoul:
         assert setup.count("owner's own language") >= 2
 
 
-class TestUserStub:
-    def test_runtime_user_md_forbids_a_profile_interview(self):
-        text = (ROOT / "runtime" / "USER.md").read_text()
-        assert "not a personal profile" in text.lower()
-        assert "pt-setup" in text
+class TestNoProfile:
+    def test_prompt_forbids_a_profile_interview(self):
+        text = " ".join(AGENTS.read_text().split())
+        assert "not a profile interviewer" in text
+        assert "Do not write a personal profile" in text
+        assert "do not build a profile" in text
 
 
 class TestSkills:
@@ -692,7 +663,7 @@ class TestSkills:
             "history.json",
             "history.py record",
         )
-        skills = list(ROOT.glob("pt-*/**/*.md")) + [ROOT / "runtime" / "SOUL.md"]
+        skills = list(ROOT.glob("pt-*/**/*.md")) + [AGENTS]
         for skill in skills:
             if "assets/advisors" in str(skill):
                 continue
@@ -717,7 +688,7 @@ class TestSkills:
         assert "Skipping this desk in the canonical scheduled paper is a bug" in desks
         # desks.md is the one statement of the priority rule (asserted in
         # test_priority_evolution_contract); pt-research owns the rosters.
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "gap card" not in soul
         assert "tournament" not in soul, "SOUL.md restates desks.md's priority rule"
         research = (ROOT / "pt-research" / "SKILL.md").read_text()
@@ -732,14 +703,14 @@ class TestSkills:
         assert "a language to write in, never a flag to branch on" in skill
         assert "not a language inferred from this file" in skill
         assert "`you` in English, `você` in Portuguese" in skill
-        assert "owner.language` from `/var/lib/hermes/pt/config.json`" in skill
+        assert "owner.language` from `/var/lib/plow/pt/config.json`" in skill
         # A config with no owner.language must not send the culler back to inferring one;
         # pt-edition owns that fallback and this desk defers to it rather than forking it.
         assert "is `pt-edition/SKILL.md`'s case" in skill
         assert "Never omit the slot" in edition
 
     def test_soul_does_not_restate_delivery_argv(self):
-        soul = (ROOT / "runtime" / "SOUL.md").read_text()
+        soul = (AGENTS).read_text()
         assert "post_to_chat.py" not in soul
 
     def test_priority_evolution_contract(self):
@@ -747,12 +718,12 @@ class TestSkills:
         for clause in (
             "Mechanical loop (authoritative)",
             "Complete at least three generations",
-            "six independent critic children in one delegate set",
+            "six independent critic children in one spawn set",
             "A critic is a prosecutor, never a reviser",
             "exactly three grounded",
             "A recommendation without a supporting sourced quote is ineligible",
             "The three it returns quote three different sourced lines",
-            "/var/lib/hermes/pt/run/desk-priority/tournament.candidate.json",
+            "/var/lib/plow/pt/run/desk-priority/tournament.candidate.json",
             "--tournament",
             "rewrite every reference to the owner by name or role into direct",
             "question in the owner's language -- the literal value read during Orient",
@@ -858,7 +829,7 @@ class TestSkills:
         assert script.stat().st_mode & stat.S_IXUSR, "record_setup.py must be executable"
         setup = (ROOT / "pt-setup" / "SKILL.md").read_text()
         assert (
-            "/var/lib/hermes/skills/pt-shared/scripts/record_setup.py"
+            "/opt/plow/skills/pt-shared/scripts/record_setup.py"
         ) in setup
 
     def test_edition_renderer_and_template_exist(self):
@@ -916,7 +887,7 @@ class TestSkills:
         # Agent Index thumbs used to be a live paper: the owner's city,
         # their priority file, and third-party inbox rows. Re-shoot from
         # index/edition.json (see index/render_screenshots.sh).
-        fixture_path = ROOT / "index" / "edition.json"
+        fixture_path = REPO / "index" / "edition.json"
         render = load_module("render_edition", "pt-edition/scripts/render_edition.py")
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
         assert render.validate(fixture) == ""
@@ -930,10 +901,10 @@ class TestSkills:
             "Blueprint",
         ):
             assert needle not in blob, needle
-        jpg = ROOT / "index" / "edition-page-1.jpg"
+        jpg = REPO / "index" / "edition-page-1.jpg"
         assert jpg.is_file() and jpg.stat().st_size > 0
-        assert not (ROOT / "index" / "edition-page-2.jpg").exists()
-        assert not (ROOT / "index" / "edition-page-3.jpg").exists()
+        assert not (REPO / "index" / "edition-page-2.jpg").exists()
+        assert not (REPO / "index" / "edition-page-3.jpg").exists()
 
     def test_recorder_has_only_the_current_recommendation_schema(self):
         recorder = (ROOT / "pt-edition" / "scripts" / "record_edition.py").read_text()
@@ -948,130 +919,98 @@ class TestSkills:
 
 
 class TestDeployment:
-    def test_skills_tsv_is_empty(self):
-        # skills.tsv pins SHARED skills from other repos; this agent installs
-        # no connectors -- Latch is the only mcp_server. Empty means exactly
-        # that, and any row would be a credential-carrying dependency to review.
-        content = (ROOT / "skills.tsv").read_text().strip()
-        assert content == ""
+    DOCKERFILE = REPO / "Dockerfile"
 
-    def test_config_declares_no_relay_server_of_its_own(self):
-        config = (ROOT / "runtime" / "config.yaml").read_text()
-        assert "plow-chat-platform" in config
-        # plow-init manages the one relay entry in mcp_servers and enables it
-        # exactly when the agent's identity carries a relay. A second entry
-        # here hand-built a device URL from a static DOMO_* pair, and a stale
-        # pair then won over the agent's own key and 401'd every run.
-        assert "/v1/relay/devices/" not in config
-        assert "DOMO_MCP_TOKEN" not in config and "DOMO_DEVICE_UID" not in config
-        # Hard gate: Hermes web_extract / web_search / Playwright stay off.
-        assert "disabled_toolsets" in config
-        assert "\n    - web\n" in config
-        assert "\n    - search\n" in config
-        assert "\n    - browser\n" in config
-        # Hard gate: plow_chat must not stream tool progress or mid-turn
-        # assistant narration (Hermes default is both on for this platform).
-        assert "interim_assistant_messages: false" in config
-        assert 'tool_progress: "off"' in config
-        assert "long_running_notifications: false" in config
-        assert "default: anthropic/claude-opus-5" in config
-        assert "anthropic/claude-opus-5: {}" in config
+    def test_no_previous_runtime_left_in_what_ships(self):
+        import re
+
+        shipped = [REPO / "Dockerfile", REPO / "compose.yml", AGENTS,
+                   *REPO.glob("boot/*.ts"), *REPO.glob("plugin/*.ts"),
+                   *(p for p in ROOT.rglob("*") if p.is_file() and p.suffix in {".md", ".py", ".html", ".json", ".applescript"})]
+        # The Agent Index reporter wiring is the base's and stays byte-for-byte.
+        shipped = [p for p in shipped if p != REPO / "boot" / "agent-index.ts"]
+        for path in shipped:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            assert not re.search(r"hermes", text, re.I), f"previous runtime named in {path.relative_to(REPO)}"
+
+    def test_base_config_pins_the_paper_model_and_its_limits(self):
+        config = (REPO / "boot" / "config.ts").read_text()
+        assert 'primary: "plow/anthropic/claude-opus-5"' in config
+        assert 'fallbacks: ["plow/anthropic/claude-sonnet-5"]' in config
+        assert "contextTokens: 400_000" in config
+        assert 'pathPrepend: ["/opt/plow/pt-venv/bin"]' in config
+        assert 'deny: ["ask_user", "secrets"]' in config
+        assert 'profile: "messaging"' in config
+        # The Mac is reached only through boot's loopback bridge: one relay,
+        # the agent's own credential, never a hand-built device URL.
+        assert '"http://127.0.0.1:18790/mcp"' in config
+        assert "DOMO_" not in config and "/v1/relay/devices/" not in config
+        # web tools stay out: the research web is Latch's browser.
+        for tool in ("web_search", "web_fetch", "browser"):
+            assert f'"{tool}"' not in config
 
     def test_compose_yml_is_the_plow_agents_surface(self):
-        # plow-agents' compose.example.yml: service `agent`, credential drop-in,
-        # named home volume. compose.override.yml must not exist: Compose loads
-        # that filename automatically and would start a second gateway.
         import re
 
-        assert not (ROOT / "compose.override.yml").exists()
-        text = (ROOT / "compose.yml").read_text()
+        assert not (REPO / "compose.override.yml").exists()
+        text = (REPO / "compose.yml").read_text()
         assert re.search(r"^  agent:", text, re.M)
         assert "build: ." in text
-        assert "./plow-credentials:/var/lib/plow/credentials.host:ro" in text
-        assert "agent-home:/var/lib/hermes" in text
-        assert "AGENT_ID: theplowtimes" in text
-        assert "TERMINAL_CWD" not in text
+        assert "env_file: ./plow-credentials" in text
+        assert "state:/var/lib/plow" in text
         assert "stop_grace_period: 35s" in text
+        # Jobs carry the owner's zone; nothing here depends on a container TZ.
+        assert "TZ:" not in text
         for line in text.splitlines():
             stripped = line.strip()
-            if stripped.startswith("-") and "skills" in stripped and "agent-home" not in stripped:
+            if stripped.startswith("-") and "skills" in stripped:
                 raise AssertionError(f"skill mount in compose.yml: {stripped}")
+        assert "plow-credentials" in (REPO / ".dockerignore").read_text()
+        assert "plow-credentials" in (REPO / ".gitignore").read_text()
 
-    def test_compose_yml_does_not_pin_a_model(self):
-        # Measured live: google/gemini-2.5-flash-lite never once called
-        # skills_list/skill_view for a news request. Unpinned, provider/model
-        # fall back to the Plow-hosted default, the same choice
-        # life-assistant-hermes-agent's compose.yml makes by omission.
-        text = (ROOT / "compose.yml").read_text()
-        assert "HERMES_PROVIDER" not in text
-        assert "HERMES_MODEL" not in text
+    def test_dockerfile_bakes_every_pt_skill_root_owned(self):
+        text = self.DOCKERFILE.read_text()
+        assert "COPY skills /opt/plow/skills" in text
+        assert "chown -R root:root /opt/plow/skills" in text
+        assert "install -d -o node -g node -m 0700 /var/lib/plow/pt" in text
+        assert sorted(p.parent.name for p in ROOT.glob("pt-*/SKILL.md")) == [
+            "pt-dashboard", "pt-edition", "pt-intake", "pt-print",
+            "pt-priority", "pt-research", "pt-setup", "pt-shared"]
 
-    def test_dockerfile_copies_every_pt_skill_outside_the_home(self):
-        import re
+    def test_dockerfile_installs_weasyprint_in_the_pinned_venv(self):
+        # The base image has no HTML-to-PDF engine. The probe must RENDER (a
+        # pydyf/weasyprint mismatch imports clean and dies on write_pdf) and
+        # must prove every shell form exec can take: on the previous runtime a
+        # login shell resolved another python3 and shipped a wall of text.
+        text = self.DOCKERFILE.read_text()
+        from_line = next(line for line in text.splitlines() if line.startswith("FROM "))
+        assert from_line.startswith("FROM ghcr.io/openclaw/openclaw:2026.9.4@sha256:")
+        for pin in ("ARG UV_VERSION=0.11.19", "ARG UV_SHA256_AMD64=", "ARG UV_SHA256_ARM64=",
+                    "ARG PT_PYTHON_VERSION=3.13", "ARG WEASYPRINT_VERSION=62.3",
+                    "ARG PYDYF_VERSION=0.10.0", "ARG PYYAML_VERSION=6.0.3"):
+            assert pin in text
+        assert 'sha256sum -c -' in text and "/opt/plow/pt-venv" in text
+        for lib in ("libpango-1.0-0", "libpangocairo-1.0-0", "libcairo2", "fonts-dejavu-core"):
+            assert lib in text
+        assert "import yaml, weasyprint" in text and "write_pdf" in text
+        for shell in ('sh -c "python3 -c', 'bash -c "python3 -c', 'bash -lc "python3 -c'):
+            assert shell in text, f"the build probe does not test {shell.split()[0:2]}"
+        assert "/etc/profile.d/pt-venv.sh" in text
 
-        dockerfile = (ROOT / "Dockerfile").read_text()
-        skills = sorted(p.parent.name for p in ROOT.glob("pt-*/SKILL.md"))
-        missing = [name for name in skills if f"COPY {name}/" not in dockerfile]
-        assert missing == [], f"in the tree but never copied into the image: {', '.join(missing)}"
-        for name in skills:
-            assert re.search(
-                rf"^COPY\s+{re.escape(name)}/\s+/opt/hermes/skills/{re.escape(name)}/\s*$",
-                dockerfile,
-                re.MULTILINE,
-            ), f"COPY {name}/ does not land at /opt/hermes/skills/{name}/"
-            assert f"/var/lib/hermes/skills/{name}" not in dockerfile
-        assert "COPY runtime/SOUL.md /opt/hermes/plow-seed/SOUL.md" in dockerfile
-        assert "COPY runtime/USER.md /var/lib/hermes/memories/USER.md" in dockerfile
-        # The home's config is built from plow-seed; runtime/config.yaml is
-        # merged onto it, and the home copy comes from that merge.
-        assert "merge_pt_seed_config.py" in dockerfile
-        assert "COPY runtime/config.yaml /var/lib/hermes" not in dockerfile
-        assert "02-copy-plow-credentials" in dockerfile
-        assert "plow-credentials" in (ROOT / ".dockerignore").read_text()
-        assert "plow-credentials" in (ROOT / ".gitignore").read_text()
+    def test_agent_index_reporter_stays_pinned(self):
+        text = self.DOCKERFILE.read_text()
+        assert ("agent-index-client/edf196031803e204cdbcd81ce574e1f54fd75f65/standalone/"
+                "agent_index_client.py") in text
+        assert "970caf7534cd7d3b71ffee8f1a576f9da4dc494a508e8ab1998ee2ce6f4a2ac4" in text
+        assert "ARG AGENTSVIEW_VERSION=0.44.0" in text
+        assert "037ea7a46d52e06b20363b4aa7cd7f28e32f31d8215803d6e9a0c96bac5818e3" in text
+        assert "6f3c76ebe119826a2def1ae226c3573b214d396a3ed7c477ef282b1063345b87" in text
+        assert "AGENT_ID=theplowtimes" in text
 
-    def test_dockerfile_installs_weasyprint_for_the_pdf_leg(self):
-        # The base image has no HTML-to-PDF engine; the renderer's --pdf leg
-        # only works because this image installs weasyprint. The build's own
-        # import check is the guard that it actually imports (native Pango/
-        # Cairo binding fails at import, not at install).
-        dockerfile = ROOT / "Dockerfile"
-        assert dockerfile.is_file(), "Dockerfile installs weasyprint for the PDF leg"
-        text = dockerfile.read_text()
-        assert "weasyprint" in text
-        assert "import weasyprint" in text
-        # The build check must RENDER, not just import: a pydyf/weasyprint
-        # mismatch imports clean and dies on the first write_pdf.
-        assert "write_pdf" in text
-        assert "pydyf" in text
-        # Installed into BOTH interpreters, because which one `python3` means
-        # depends on the shell, and this flow uses both:
-        #   sh -c / bash -c -> /opt/hermes/.venv/bin/python3
-        #   bash -lc        -> /usr/bin/python3   (login resets PATH, dropping
-        #                                          /opt/hermes/.venv/bin)
-        # History, in order, all measured live: a system dist-packages
-        # `--target` made the LOGIN shell work and the plain shell fail, so
-        # this test was written to forbid a login-shell probe. Then on
-        # 2026-09-16 the venv-only install shipped and the agent's terminal
-        # tool -- which runs a LOGIN shell -- got ModuleNotFoundError, was
-        # told "weasyprint is not installed", took the text fallback, and
-        # handed the owner a wall of text twice while the venv rendered that
-        # same edition.json to a valid PDF. Neither interpreter alone is
-        # enough; the answer is both, and a probe that proves both.
-        assert "--python /opt/hermes/.venv/bin/python3" in text
-        assert "--python /usr/bin/python3" in text
-        assert text.count('"PyYAML==') == 2
-        assert "import yaml" in text
-        # The probe must exercise the plain shell AND the login shell: each
-        # one alone has already shipped a broken PDF leg.
-        assert "bash -lc" in text, "the build probe does not test a login shell"
-        assert 'sh -c "python3 -c' in text, "the build probe does not test a plain shell"
-        # Pinned by digest, like the fleet pin -- a tag re-resolves on pull.
-        from_line = next(
-            line for line in text.splitlines() if line.startswith("FROM ")
-        )
-        assert "@sha256:" in from_line
-
+    def test_license_and_notice(self):
+        assert (REPO / "LICENSE").read_text().startswith("MIT License")
+        notice = (REPO / "NOTICE").read_text()
+        assert "plow-pbc/plow-openclaw-agent" in notice and "5430d2e" in notice
 
 
 class TestImportability:
