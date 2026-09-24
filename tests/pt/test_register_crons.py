@@ -295,7 +295,7 @@ class TestArgv:
         assert argv[argv.index("--tz") + 1] == TZ
         assert argv[argv.index("--session") + 1] == "isolated"
         assert argv[argv.index("--message") + 1] == sub["prompt"]
-        assert argv[argv.index("--model") + 1] == "plow/anthropic/claude-opus-5"
+        assert argv[argv.index("--model") + 1] == "plow/z-ai/glm-5.2"
         assert "--no-deliver" in argv and "--exact" in argv and "--json" in argv
         assert "--announce" not in argv and "--token" not in argv
 
@@ -335,7 +335,7 @@ def registered_like_spec(topics_list, **overrides):
     """Rows exactly as a previous run of this script would have left them."""
     return [row(j["name"], expr=j["schedule"] if j["tz"] else None,
                 at=None if j["tz"] else j["schedule"], tz=j["tz"], message=j["prompt"],
-                model="plow/anthropic/claude-opus-5", **overrides)
+                model="plow/z-ai/glm-5.2", **overrides)
             for j in crons.desired_jobs(topics_list, "07:00", TZ)]
 
 
@@ -684,10 +684,10 @@ class TestDrift:
         assert crons.job_drift(self.JOB, self.spec(expr="15 6 * * *", tz=TZ, message="old")) is True
 
     def test_model_drift_detected(self):
-        assert crons.job_drift(self.JOB, self.spec(expr="15 6 * * *", tz=TZ, model="plow/z-ai/glm-5.2")) is True
+        assert crons.job_drift(self.JOB, self.spec(expr="15 6 * * *", tz=TZ, model="plow/anthropic/claude-opus-5")) is True
 
     def test_matching_spec_is_not_drift(self):
-        spec = self.spec(expr="15 6 * * *", tz=TZ, message="same", model="plow/anthropic/claude-opus-5")
+        spec = self.spec(expr="15 6 * * *", tz=TZ, message="same", model="plow/z-ai/glm-5.2")
         assert crons.job_drift(self.JOB, spec) is False
 
     def test_absent_fields_are_not_drift(self):

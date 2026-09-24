@@ -20,7 +20,8 @@ export function renderConfig(identity: Identity, apiBase: string) {
       baseUrl: `${apiBase}/v1`, apiKey: "${PLOW_AGENT_TOKEN}", api: "openai-completions", authHeader: true,
       request: { allowPrivateNetwork: true },
       models: [
-        // The paper was tuned on Opus 5; other models wrote shorter, worse editions.
+        { id: "z-ai/glm-5.2", name: "GLM 5.2", input: ["text"], contextWindow: 1048576, cost: { input: 0.5544, output: 1.7424 } },
+        // The paper was first tuned on Opus 5, which stays last in the fallback chain.
         // contextTokens is the working budget OpenClaw compacts against: 400k leaves
         // a three-generation advisor tournament room without compaction churn.
         { id: "anthropic/claude-opus-5", name: "Claude Opus 5", input: ["text", "image"], contextWindow: 1000000, contextTokens: 400_000, cost: { input: 5.00, output: 25.00 } },
@@ -32,7 +33,7 @@ export function renderConfig(identity: Identity, apiBase: string) {
       // The paper's AGENTS.md plus up to 8,000 characters of Latch instructions is
       // past OpenClaw's 20,000-character default; truncation drops its last rules.
       bootstrapMaxChars: 40_000,
-      model: { primary: "plow/anthropic/claude-opus-5", fallbacks: ["plow/anthropic/claude-sonnet-5"] }, sandbox: { mode: "off" },
+      model: { primary: "plow/z-ai/glm-5.2", fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"] }, sandbox: { mode: "off" },
       // The advisor tournament spawns up to six critics at once; children never spawn.
       // Delegation stays a suggestion so owner chat turns are not pushed into sub-agents.
       subagents: { maxChildrenPerAgent: 6, maxConcurrent: 6, maxSpawnDepth: 1, delegationMode: "suggest" },
