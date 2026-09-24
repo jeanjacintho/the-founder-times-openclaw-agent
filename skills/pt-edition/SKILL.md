@@ -222,6 +222,10 @@ this skill delivers it from that session like any other paper (no
 
 ## Render and deliver
 
+0. Run bare `/opt/plow/skills/pt-shared/scripts/owner_phrases.py status`. On
+   `PHRASES:missing`, run bare `/opt/plow/skills/pt-shared/scripts/owner_phrases.py template`, translate every value into that language keeping each `{placeholder}` exactly, and pipe `{"phrases": {...}}` into `/opt/plow/skills/pt-shared/scripts/owner_phrases.py record` (it prints `PHRASES:ready`, or names what to fix) before rendering — the page's labels
+   and every script line after this are read from it.
+
 1. Run the renderer — it is the only thing that writes the edition. One
    complete command, printer or not; **copy it and change only the
    paths.** Do not add flags that are not here:

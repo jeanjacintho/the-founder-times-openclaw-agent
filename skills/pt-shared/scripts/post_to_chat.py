@@ -58,7 +58,7 @@ from zoneinfo import ZoneInfo
 
 from bearer_http import post_json, post_json_read, put_bytes, require
 from owner_chat import home_channel
-from owner_language import is_portuguese
+from owner_phrases import phrase
 from owner_time import owner_now
 from pt_paths import config_file, pt_home
 from setup_needed import owner_language
@@ -182,20 +182,6 @@ def _best_effort(run, args, failure):
 
 
 PRINT_TIMEOUT = 600
-PRINT_MISS = {
-    "en": {
-        "lede": "page not printed — ",
-        "retry": "; next scheduled run retries",
-        "timeout": f"outcome unknown: still running after {PRINT_TIMEOUT}s",
-        "no_pdf": "no PDF to print at {}",
-    },
-    "pt": {
-        "lede": "página não impressa — ",
-        "retry": "; a próxima edição agendada tenta de novo",
-        "timeout": f"resultado desconhecido: ainda em execução após {PRINT_TIMEOUT}s",
-        "no_pdf": "nenhum PDF para imprimir em {}",
-    },
-}
 
 
 def print_page(pdf_path):
@@ -228,13 +214,16 @@ def print_page(pdf_path):
         detail = None
     except Exception as exc:
         detail = str(exc)
-    words = PRINT_MISS["pt" if is_portuguese(owner_language(CONFIG_DEFAULT)) else "en"]
+    # The print-miss words are owner_phrases.py's: the owner's own language
+    # when the paper has written it, curated Portuguese or English otherwise.
+    language = owner_language(CONFIG_DEFAULT)
+    lede = phrase("print.lede", language)
     if detail is None:  # an unknown outcome may still print: no retry promise
-        return words["lede"] + words["timeout"]
+        return lede + phrase("print.timeout", language, seconds=PRINT_TIMEOUT)
     if not os.path.isfile(pdf_path):
-        detail = words["no_pdf"].format(pdf_path)
-    line = words["lede"] + detail.removeprefix("error: ")[:200]
-    return line if "outcome unknown" in detail else line + words["retry"]
+        detail = phrase("print.no_pdf", language, path=pdf_path)
+    line = lede + detail.removeprefix("error: ")[:200]
+    return line if "outcome unknown" in detail else line + phrase("print.retry", language)
 
 
 RECORD_TIMEOUT = 300

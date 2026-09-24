@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import post_to_chat  # noqa: E402
-from owner_language import is_portuguese  # noqa: E402
+from owner_phrases import phrase  # noqa: E402
 import setup_needed as _gate  # noqa: E402
 from bearer_http import post_json  # noqa: E402
 from pt_paths import config_file, pt_home  # noqa: E402
@@ -31,19 +31,13 @@ BUSY_NEW_WAVE_SECONDS = 90
 BUSY_STAMP_DEFAULT = str(pt_home() / "run" / "setup-busy.json")
 CONFIG_DEFAULT = str(config_file())
 
-BUSY = {
-    "pt": "⏳ Um instante — tô nessa.",
-    "en": "⏳ Hang on a sec — still setting up.",
-}
-BUSY_STILL = {
-    "pt": "⏳ Ainda nisso — já já eu falo.",
-    "en": "⏳ Still on it — back in a moment.",
-}
+# The wait lines live in owner_phrases.py: the owner's own language when the
+# paper has written it, curated Portuguese or English otherwise.
+STATUS_KEYS = {"busy": "chat.busy", "busy-still": "chat.busy_still"}
 
 
 def status_text(kind, language):
-    table = {"busy": BUSY, "busy-still": BUSY_STILL}[kind]
-    return table["pt"] if is_portuguese(language) else table["en"]
+    return phrase(STATUS_KEYS[kind], language)
 
 
 owner_language = _gate.owner_language

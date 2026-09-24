@@ -12,6 +12,7 @@ import { on, once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import WebSocket from "ws";
 import { isListeningGroup } from "./group-listen.ts";
+import { turnFailedNotice } from "./owner-phrases.ts";
 
 export type Member = { type: "member"; uid: string; display_name: string; role: string; provider_key?: string };
 export type Agent = { type: "agent"; relationship: string; line: { uid: string; display_name?: string } };
@@ -161,7 +162,7 @@ export async function listen(account: Account, signal: AbortSignal, log: (text: 
     remember(message.uid);
     log(`acked chat=${chatUid} message=${message.uid}`);
     if (notifyFailure) await request(account, `/chats/${chatUid}/messages`, {
-      body: "I couldn't finish handling your last message. Part of the request may have already happened, so please check before resending.",
+      body: await turnFailedNotice(),
       attachment_uids: [],
     }).catch(error => log(`failure notice failed chat=${chatUid}: ${(error as Error).name}; not retrying`));
   };
