@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import types
 import subprocess
 import sys
@@ -305,15 +306,11 @@ class TestHoldUntil:
         owner_zone(monkeypatch, tmp_path, tz)
         assert post.seconds_until_hhmm(hour, now=now.replace(tzinfo=ZoneInfo(tz))) == expected
 
-    @pytest.mark.parametrize("now, expected", [
-        (datetime(2026, 9, 20, 6, 59, 30), [30]),
-        (datetime(2026, 9, 20, 8, 0, 0), []),  # already due: no sleep
-    ])
-    def test_hold_sleeps_only_the_remaining_seconds(self, monkeypatch, tmp_path, now, expected):
-        owner_zone(monkeypatch, tmp_path, "UTC")
-        slept = []
-        post.hold_until("07:00", sleep=slept.append, now=now.replace(tzinfo=ZoneInfo("UTC")))
-        assert slept == expected
+    def test_nothing_sleeps_inside_the_session_any_more(self):
+        # A session sleeping until the hour is killed (synchronous exec, 30-min
+        # ceiling); the send clock is the outbox's, see TestOutboxDelivery.
+        assert not hasattr(post, "hold_until")
+        assert "time.sleep" not in (ROOT / "pt-shared" / "scripts" / "post_to_chat.py").read_text()
 
     def test_the_owner_zone_wins_over_the_container_tz(self, monkeypatch, tmp_path):
         owner_zone(monkeypatch, tmp_path, "America/Sao_Paulo")
@@ -352,3 +349,114 @@ class TestPrintMissInTheOwnersLanguage:
     def test_phrases_for_another_language_are_never_used(self, tmp_path, monkeypatch):
         self._write_phrases(tmp_path, "Deutsch")
         assert self._miss(tmp_path, monkeypatch) == ["page not printed — lp 1: no such printer; next scheduled run retries"]
+
+
+class TestOutboxDelivery:
+    """A scheduled paper starts hours before its delivery hour. Sleeping inside
+    the session until then dies (OpenClaw's exec is synchronous with a 30-min
+    ceiling), so the paper is staged in pt/outbox and the no-agent pt-deliver
+    job posts it once its hour has come."""
+
+    ZONE = ZoneInfo("America/Sao_Paulo")
+
+    def _setup(self, tmp_path, monkeypatch, deliver_runs=True):
+        home = tmp_path / "pt"
+        (home / "run" / "daily-2026-09-25").mkdir(parents=True)
+        (home / "config.json").write_text(json.dumps({"owner": {"timezone": "America/Sao_Paulo"}}))
+        monkeypatch.setenv("PT_HOME", str(home))
+        run = home / "run" / "daily-2026-09-25"
+        (run / "edition.pdf").write_bytes(b"%PDF edition")
+        (run / "edition.companion.txt").write_text("companion")
+        (run / "edition.json").write_text(json.dumps({"date": "2026-09-25", "sections": [
+            {"kind": "section", "topic_id": "t_9f2a", "desk": "news", "title": "IA", "body": "b"}]}))
+        (home / "run" / "t_9f2a").mkdir()
+        (home / "run" / "t_9f2a" / "notes.json").write_text(json.dumps({"notes": [{"claim": "c", "url": "https://x.example"}]}))
+        posts, finalized = [], []
+        monkeypatch.setattr(post, "resolve_chat", lambda: ("https://api.example", "cht_1", "tok"))
+        monkeypatch.setattr(post, "declare_and_upload", lambda base, uid, token, pdf, filename=None: f"att:{Path(pdf).read_bytes().decode()}")
+        monkeypatch.setattr(post, "post_json", lambda *a: posts.append(a[-1]))
+        monkeypatch.setattr(post, "run_finalize_topics", lambda path: finalized.append(("finalize", path)) or "FINALIZED")
+        monkeypatch.setattr(post, "print_page", lambda pdf: finalized.append(("print", pdf)) and None)
+        monkeypatch.setattr(post, "run_record_edition", lambda path, at: finalized.append(("record", path)) or "RECORDED")
+        monkeypatch.setattr(post, "deliver_job_runs", lambda: deliver_runs)
+        return home, run, posts, finalized
+
+    def _at(self, monkeypatch, hh, mm, day=25):
+        instant = datetime(2026, 9, day, hh, mm, tzinfo=self.ZONE)
+        monkeypatch.setattr(post, "_now", lambda: instant)
+
+    def _hold(self, monkeypatch, run, hhmm="09:30"):
+        monkeypatch.setattr(sys, "argv", ["post_to_chat.py", "--pdf", str(run / "edition.pdf"),
+                                          "--text-file", str(run / "edition.companion.txt"), "--hold-until", hhmm])
+        post.main()
+
+    def test_an_hour_already_passed_posts_now_and_leaves_no_outbox(self, tmp_path, monkeypatch):
+        home, run, posts, _ = self._setup(tmp_path, monkeypatch)
+        self._at(monkeypatch, 9, 45)
+        self._hold(monkeypatch, run)
+        assert len(posts) == 1 and not (home / "outbox").exists()
+
+    @pytest.mark.parametrize("state", ["missing or disabled"])
+    def test_without_a_running_deliver_job_it_posts_now(self, tmp_path, monkeypatch, state):
+        home, run, posts, _ = self._setup(tmp_path, monkeypatch, deliver_runs=False)
+        self._at(monkeypatch, 8, 0)
+        self._hold(monkeypatch, run)
+        assert len(posts) == 1 and not (home / "outbox").exists()
+
+    def test_an_hour_ahead_is_staged_as_copies_and_posted_once_when_due(self, tmp_path, monkeypatch, capsys):
+        import shutil
+        home, run, posts, finalized = self._setup(tmp_path, monkeypatch)
+        self._at(monkeypatch, 8, 0)
+        self._hold(monkeypatch, run)
+        assert posts == [] and "held for 09:30" in capsys.readouterr().out
+        [entry] = [p for p in (home / "outbox").iterdir() if not p.name.startswith(".")]
+        assert (entry / "delivery.json").exists() and (entry / "edition.json").exists()
+        # The next paper archives run/: the outbox must not need it.
+        shutil.rmtree(home / "run")
+        self._at(monkeypatch, 9, 29)
+        assert post.main_flush() == 0 and posts == []
+        self._at(monkeypatch, 9, 31)
+        assert post.main_flush() == 0
+        assert post.main_flush() == 0
+        assert len(posts) == 1 and posts[0]["body"] == "companion" and posts[0]["attachment_uids"] == ["att:%PDF edition"]
+        assert [step for step, _ in finalized] == ["finalize", "print", "record"]
+        assert not entry.exists(), "a delivered entry is removed"
+
+    def test_a_day_old_entry_is_a_late_catch_up(self, tmp_path, monkeypatch):
+        home, run, posts, _ = self._setup(tmp_path, monkeypatch)
+        self._at(monkeypatch, 8, 0)
+        self._hold(monkeypatch, run)
+        self._at(monkeypatch, 9, 31, day=26)
+        post.main_flush()
+        assert len(posts) == 1
+
+    def test_the_notes_travel_with_the_entry_so_the_record_keeps_them(self, tmp_path, monkeypatch):
+        home, run, posts, finalized = self._setup(tmp_path, monkeypatch)
+        self._at(monkeypatch, 8, 0)
+        self._hold(monkeypatch, run)
+        [entry] = [p for p in (home / "outbox").iterdir() if not p.name.startswith(".")]
+        assert json.loads((entry / "t_9f2a" / "notes.json").read_text())["notes"][0]["url"] == "https://x.example"
+
+    def test_a_failed_post_leaves_the_entry_pending(self, tmp_path, monkeypatch):
+        home, run, posts, _ = self._setup(tmp_path, monkeypatch)
+        self._at(monkeypatch, 8, 0)
+        self._hold(monkeypatch, run)
+        def refuse(*a):
+            raise SystemExit("error: Plow Chat returned HTTP 503")
+        monkeypatch.setattr(post, "post_json", refuse)
+        self._at(monkeypatch, 9, 31)
+        assert post.main_flush() == 1
+        [entry] = [p for p in (home / "outbox").iterdir() if not p.name.startswith(".")]
+        assert (entry / "delivery.json").exists(), "still pending for the next minute"
+
+    def test_a_flush_already_running_leaves_the_entry_to_it(self, tmp_path, monkeypatch):
+        import fcntl
+        home, run, posts, _ = self._setup(tmp_path, monkeypatch)
+        self._at(monkeypatch, 8, 0)
+        self._hold(monkeypatch, run)
+        self._at(monkeypatch, 9, 31)
+        with open(home / "outbox" / ".flush.lock", "a") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            assert post.main_flush() == 0 and posts == [], "an overlapping run does nothing"
+        post.main_flush()
+        assert len(posts) == 1

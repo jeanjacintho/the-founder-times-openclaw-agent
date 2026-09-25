@@ -17,11 +17,15 @@ What this module guarantees, measured against OpenClaw 2026.9.4:
     failed command, non-JSON, a wrong shape or a truncated page ABORTS.
   * OpenClaw's own jobs (heartbeat, memory dreaming, skill review) live in the
     same list; callers only ever act on pt-* names.
+  * A job with a `command` (pt-deliver) is a no-agent command payload
+    (`--command-argv`): no session, message or model, run on the gateway.
 """
 from __future__ import annotations
 
 import json
 import subprocess
+
+COMMAND_TIMEOUT_SECONDS = 600
 
 OPENCLAW = ["node", "/app/openclaw.mjs"]
 MODEL = "plow/moonshotai/kimi-k2.5"
@@ -48,8 +52,9 @@ class Job(dict):
         schedule = self.get("schedule") or {}
         payload = self.get("payload") or {}
         expr = schedule.get("expr") if schedule.get("kind") == "cron" else schedule.get("at")
+        command = payload.get("argv") if payload.get("kind") == "command" else None
         return {"schedule": expr, "tz": schedule.get("tz"),
-                "prompt": payload.get("message"), "model": payload.get("model")}
+                "prompt": payload.get("message"), "model": payload.get("model"), "command": command}
 
 
 def _run(argv):
@@ -85,11 +90,19 @@ class CronBackend:
         return [Job(r) for r in rows]
 
     def _schedule_args(self, job):
+        if job.get("every"):
+            return ["--every", job["every"]]
         if job.get("tz"):
             return ["--cron", job["schedule"], "--tz", job["tz"], "--exact"]
         return ["--at", job["schedule"]]
 
+    def _command_args(self, job):
+        return ["--command-argv", json.dumps(job["command"]), "--no-deliver",
+                "--timeout-seconds", str(COMMAND_TIMEOUT_SECONDS), "--json"]
+
     def create_argv(self, job):
+        if job.get("command"):
+            return self._cron("add", "--name", job["name"], *self._schedule_args(job), *self._command_args(job))
         return self._cron("add", "--name", job["name"], *self._schedule_args(job),
                           "--session", "isolated", "--message", job["prompt"],
                           "--no-deliver", "--model", job.get("model", MODEL), "--json")
@@ -97,6 +110,8 @@ class CronBackend:
     def edit_argv(self, job_id, job):
         """Patch a registered job in place -- never remove-then-create, or a
         failed create leaves the paper with no job."""
+        if job.get("command"):
+            return self._cron("edit", job_id, *self._schedule_args(job), *self._command_args(job))
         return self._cron("edit", job_id, *self._schedule_args(job),
                           "--message", job["prompt"], "--no-deliver",
                           "--model", job.get("model", MODEL), "--json")

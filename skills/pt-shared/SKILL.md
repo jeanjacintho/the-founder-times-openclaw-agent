@@ -74,8 +74,10 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
 - `scripts/post_to_chat.py` — the edition's chat leg: POST the PDF plus its
   chat-only mail/sports companion when present, or chat text if there is no PDF.
   `--filename The-Founder-Times-<date>.pdf` is the name shown in chat (the
-  run file stays `edition.pdf` on disk). `--hold-until HH:MM` waits for
-  that clock before posting (scheduled papers; the on-demand copy has none). After
+  run file stays `edition.pdf` on disk). `--hold-until HH:MM` is a scheduled paper's
+  send clock: while it is ahead the paper is staged in `pt/outbox/` for the
+  no-agent `pt-deliver` job (`--flush-outbox`), never slept on in the session;
+  once passed it posts now (the on-demand copy has none). After
   either POST it prints the run's `edition.pdf` when the printer is configured
   (the text leg too, so a missing PDF is reported as a miss), records
   the edition and finalizes its topics (`pt-edition` step 2).
