@@ -251,6 +251,12 @@ Send only the `NEXT_QUESTION` it prints (question 3a), then stop.
 
 ## NEXT_QUESTION=priority
 
+This is the advisor desk (`priority.configured`) — a Salyer-style
+adversarial tournament, not the signal-listening feature below
+(`signals.*`, question 5). The two share the English word "priority" and
+nothing else; `priority.configured=true` implies nothing about whether any
+signal source is on.
+
 Copy the question (CHAT_VOICE), in the owner's language:
 
 > ⭐ Every morning the paper can open with what Patrick Salyer would tell you after watching your last day. What are you trying to make true over the next few quarters? (or "no" to skip the advisor desk)
@@ -359,9 +365,14 @@ any:
 
 Send only the `NEXT_QUESTION` it prints (question 5a), then stop.
 
-**5a. Ask which signals the paper may listen to.** Copy the locked line.
-Every source starts off; this is how the owner turns any of them on.
-Send only this, then stop.
+**5a. Ask which signals the paper may listen to.** This is the
+`signals.group_chat`/`signals.email`/`signals.imessage` switches — email,
+iMessage and group-chat listening — a different feature from the advisor
+desk above (`priority.configured`, question 3), even though the owner-facing
+copy below says "priorities". Never infer a signal source is on from
+`priority.configured`; check `config.json` or `set_signal_source.py`'s own
+output. Copy the locked line. Every source starts off; this is how the
+owner turns any of them on. Send only this, then stop.
 
 Portuguese:
 
