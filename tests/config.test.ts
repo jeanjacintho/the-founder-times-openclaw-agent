@@ -78,6 +78,10 @@ test("Kimi K2.5 falls back to Sonnet, then Opus, on the Plow provider with expli
   // (moonshotai/kimi-k2.5); cost is what the Plow gateway billed on a measured call.
   assert.deepEqual(config.models.providers.plow.models, [{
     id: "moonshotai/kimi-k2.5", name: "Kimi K2.5", input: ["text"], contextWindow: 262144,
+    // A reasoning model: without this OpenClaw drops its reasoning_content deltas, so a
+    // long think looks idle (aborted at 120 s) and the next tool-call message is replayed
+    // without the reasoning_content Kimi requires (measured live 2026-09-25).
+    reasoning: true, maxTokens: 32768, compat: { requiresReasoningContentOnAssistantMessages: true },
     cost: { input: 0.57, output: 2.85 },
   }, {
     id: "z-ai/glm-5.2", name: "GLM 5.2", input: ["text"], contextWindow: 1048576,

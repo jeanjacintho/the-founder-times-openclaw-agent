@@ -22,7 +22,13 @@ export function renderConfig(identity: Identity, apiBase: string) {
       models: [
         // Primary since 2026-09-24, to spend fewer tokens. contextWindow is the Kimi K2.5
         // window in OpenClaw's provider catalog; cost is what the Plow gateway billed.
-        { id: "moonshotai/kimi-k2.5", name: "Kimi K2.5", input: ["text"], contextWindow: 262144, cost: { input: 0.57, output: 2.85 } },
+        // It is a reasoning model and the gateway streams its thinking as reasoning_content:
+        // unmarked, OpenClaw drops those deltas, so a long think reads as idle (aborted at
+        // 120 s) and the next tool-call message goes back without the reasoning_content Kimi
+        // requires. reasoning/maxTokens/compat match OpenClaw's own catalog entry for it.
+        { id: "moonshotai/kimi-k2.5", name: "Kimi K2.5", input: ["text"], contextWindow: 262144,
+          reasoning: true, maxTokens: 32768, compat: { requiresReasoningContentOnAssistantMessages: true },
+          cost: { input: 0.57, output: 2.85 } },
         { id: "z-ai/glm-5.2", name: "GLM 5.2", input: ["text"], contextWindow: 1048576, cost: { input: 0.5544, output: 1.7424 } },
         // The paper was first tuned on Opus 5, which stays last in the fallback chain.
         // contextTokens is the working budget OpenClaw compacts against: 400k leaves
