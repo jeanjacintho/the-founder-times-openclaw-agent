@@ -97,6 +97,14 @@ _PAPER_RE = re.compile(r"^pt-paper-(?P<hhmm>(?:[01]\d|2[0-3])[0-5]\d)$")
 # The on-demand copy (--now): a one-shot the sweep below never removes, so
 # a queued paper survives a registration run; the next --now replaces it.
 NOW_NAME = "pt-daily-edition-now"
+# The outbox's flusher: a scheduled paper that finishes before its delivery hour
+# is staged in pt/outbox (post_to_chat.py --hold-until) instead of sleeping in
+# its session, and this no-agent command job posts it once the hour comes. It
+# runs every minute with no model and no tokens, is never swept, and drifts only
+# on its command. The venv's python: a command job's PATH is the gateway's.
+DELIVER_NAME = "pt-deliver"
+DELIVER_ARGV = ["/opt/plow/pt-venv/bin/python3",
+                "/opt/plow/skills/pt-shared/scripts/post_to_chat.py", "--flush-outbox"]
 WORKSPACE_LOCK = "paper-workspace"
 DEFAULT_LEAD_MINUTES = 0
 # Every acquirer of a lock uses one lifetime: the run itself plus
@@ -360,6 +368,12 @@ def daily_job(delivery_hour, lead_minutes, owner_tz, *, name=DAILY_NAME):
     }
 
 
+def deliver_job():
+    """The one job every install has besides its papers: pt-deliver."""
+    return {"name": DELIVER_NAME, "every": "1m", "schedule": None, "tz": None,
+            "prompt": None, "command": DELIVER_ARGV}
+
+
 def paper_job_name(hour):
     """pt-paper-HHMM from a strict HH:MM (12:30 → pt-paper-1230)."""
     hh, mm = hour.split(":")
@@ -554,6 +568,8 @@ def job_drift(job, spec):
     the fields a spec change actually moves (the delivery hour, the owner's
     zone, the lead, the delivery contract, the model the paper is tuned on).
     """
+    if job.get("command") is not None:  # a command job has no prompt or model
+        return spec.get("command") is not None and spec["command"] != job["command"]
     for key in ("schedule", "tz", "prompt", "model"):
         have = spec.get(key)
         want = job.get(key, MODEL) if key == "model" else job.get(key)
@@ -628,7 +644,7 @@ def main(argv=None, backend=None, config_path=CONFIG_FILE, env=None):
     paused = []
     pending = []
 
-    for job in desired_jobs(topics, delivery_hour, owner_tz, lead_minutes, extra_hours):
+    for job in [*desired_jobs(topics, delivery_hour, owner_tz, lead_minutes, extra_hours), deliver_job()]:
         current = registered.get(job["name"])
         if current is not None:
             if not current.enabled:
@@ -651,13 +667,13 @@ def main(argv=None, backend=None, config_path=CONFIG_FILE, env=None):
             print(
                 f"updating drifted job: {job['name']} "
                 f"(was {current.spec.get('schedule')!r} {current.spec.get('tz')!r}, "
-                f"now {job['schedule']!r} {job['tz']!r})"
+                f"now {job['schedule'] or job.get('every')!r} {job['tz']!r})"
             )
             _check(backend.edit(current.id, job), f"could not update drifted job {job['name']}")
-            print(f"updated: {job['name']} ({job['schedule']})")
+            print(f"updated: {job['name']} ({job['schedule'] or 'every ' + job['every']})")
         else:
             _check(backend.create(job), f"could not register {job['name']}")
-            print(f"registered: {job['name']} ({job['schedule']})")
+            print(f"registered: {job['name']} ({job['schedule'] or 'every ' + job['every']})")
 
     for name in stale_names(topics, registered, len(extra_hours), delivery_hour):
         _check(backend.remove(registered[name].id), f"could not remove stale job {name}")

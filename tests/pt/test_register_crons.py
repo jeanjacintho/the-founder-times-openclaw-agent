@@ -336,14 +336,14 @@ def registered_like_spec(topics_list, **overrides):
     return [row(j["name"], expr=j["schedule"] if j["tz"] else None,
                 at=None if j["tz"] else j["schedule"], tz=j["tz"], message=j["prompt"],
                 model="plow/moonshotai/kimi-k2.5", **overrides)
-            for j in crons.desired_jobs(topics_list, "07:00", TZ)]
+            for j in crons.desired_jobs(topics_list, "07:00", TZ)] + [deliver_row()]
 
 
 class TestMain:
     def test_needs_no_container_tz(self, tmp_path, monkeypatch):
         sched = FakeScheduler()
         assert run_main(tmp_path, monkeypatch, [], sched, env={}) == 0
-        assert [w[0] for w in sched.writes] == ["add"]
+        assert [w[0] for w in sched.writes] == ["add", "add"]  # the daily paper and pt-deliver
 
     def test_now_queues_the_main_papers_own_prompt_as_a_one_shot(
             self, tmp_path, monkeypatch, capsys):
@@ -891,3 +891,53 @@ class TestTournamentWindow:
     def test_the_on_demand_copy_states_no_window(self):
         p = crons.paper_prompt(lead_minutes=150)
         assert "minutes-until" not in p and "starts 150 minutes before" not in p
+
+
+def deliver_row(argv=None, enabled=True):
+    """The pt-deliver job as `openclaw cron list --json` returns a command job."""
+    return {"id": "id-pt-deliver", "name": "pt-deliver", "enabled": enabled, "sessionTarget": "isolated",
+            "schedule": {"kind": "every", "everyMs": 60000},
+            "payload": {"kind": "command", "argv": argv if argv is not None else crons.DELIVER_ARGV},
+            "delivery": {"mode": "none"}}
+
+
+class TestDeliverJob:
+    """The outbox's flusher: a no-agent command job every minute, never swept."""
+
+    def test_it_is_registered_as_a_command_with_no_agent(self, tmp_path, monkeypatch):
+        sched = FakeScheduler()
+        run_main(tmp_path, monkeypatch, [], sched)
+        (add,) = [w for w in sched.writes if "pt-deliver" in w]
+        assert add[:3] == ["add", "--name", "pt-deliver"]
+        assert add[add.index("--every") + 1] == "1m"
+        assert json.loads(add[add.index("--command-argv") + 1]) == crons.DELIVER_ARGV
+        assert "--no-deliver" in add and add[add.index("--timeout-seconds") + 1] == "600"
+        for agent_only in ("--message", "--model", "--session"):
+            assert agent_only not in add, agent_only
+
+    def test_it_posts_with_the_venv_python_the_flush_flag(self):
+        assert crons.DELIVER_ARGV == ["/opt/plow/pt-venv/bin/python3",
+                                      "/opt/plow/skills/pt-shared/scripts/post_to_chat.py", "--flush-outbox"]
+
+    def test_a_present_job_is_left_alone(self, tmp_path, monkeypatch):
+        sched = FakeScheduler(registered_like_spec([]))
+        run_main(tmp_path, monkeypatch, [], sched)
+        assert sched.writes == []
+
+    def test_a_moved_command_is_edited_in_place(self, tmp_path, monkeypatch):
+        rows = [r for r in registered_like_spec([]) if r["name"] != "pt-deliver"]
+        sched = FakeScheduler(rows + [deliver_row(argv=["python3", "old.py"])])
+        run_main(tmp_path, monkeypatch, [], sched)
+        (edit,) = sched.writes
+        assert edit[:2] == ["edit", "id-pt-deliver"]
+        assert json.loads(edit[edit.index("--command-argv") + 1]) == crons.DELIVER_ARGV
+
+    def test_it_is_never_stale(self):
+        assert "pt-deliver" not in crons.stale_names([], {"pt-deliver": object()}, 0, "07:00")
+
+    def test_a_disabled_job_is_reported_not_duplicated(self, tmp_path, monkeypatch):
+        rows = [r for r in registered_like_spec([]) if r["name"] != "pt-deliver"]
+        sched = FakeScheduler(rows + [deliver_row(enabled=False)])
+        with pytest.raises(SystemExit, match="pt-deliver"):
+            run_main(tmp_path, monkeypatch, [], sched)
+        assert sched.writes == []

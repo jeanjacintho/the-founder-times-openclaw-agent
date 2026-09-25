@@ -16,6 +16,7 @@ topic list:
 | `pt-paper-HHMM` | `<min> <hour> * * *` from a section `deliver_at` that is not `delivery.hour` (same lead subtraction) | one job per distinct hour; desks plus only the sections at that hour. Two sections at 12:30 share `pt-paper-1230`. A cancelled last section at that hour is pruned |
 | `pt-subscription-<id>` | `<min> <hour> * * *` from `delivery.hour` | one per subscription topic not yet cancelled; created and removed as topics change |
 | `pt-oneoff-<id>` | one-shot at the topic's `scheduled_for` (pt-intake: `now + 3m` quick, next `delivery.hour` deep) | one per pending one-off still ahead, so a rebuild re-creates it; a past one is not re-armed. The sweep removes it once the topic is delivered, cancelled or missing |
+| `pt-deliver` | every minute | the outbox's flusher: a **no-agent command job** (`--command-argv` running `post_to_chat.py --flush-outbox` with the venv's python; no model, no tokens). Posts each staged paper once its hour has come. Every install has it; the sweep never removes it; it drifts only on its command |
 | `pt-daily-edition-now` | one-shot, a minute out | `register_crons.py --now`: the main paper on demand, same prompt as `pt-daily-edition` without `--hold-until`; the next `--now` replaces it, the sweep never removes it |
 
 The daily schedule is computed in minutes, so `00:00 − 0min` is `0 0 * * *`
@@ -32,7 +33,9 @@ when boot did not know it yet). Every cron row carries `--tz` =
 daylight saving included; one-shots carry an ISO time with its offset.
 Scheduled papers add `--hold-until` at that job's hour (read on the same
 owner clock) so a recipe that finished early does not send before the clock;
-the on-demand copy has none.
+the on-demand copy has none. Nothing waits in a session for that hour: the
+paper is staged in `pt/outbox/` and `pt-deliver` posts it (a session sleeping
+until the hour is killed by the exec timeout).
 
 The daily run additionally takes a **run lock** with
 `pt-shared/scripts/run_lock.py` (see the prompt this script writes): two runs
