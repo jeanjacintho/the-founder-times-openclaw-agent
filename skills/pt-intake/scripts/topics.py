@@ -21,7 +21,7 @@ Subcommands:
   cancel   <id>            any topic the owner says stop on
   mark     <id> --status {pending,running,delivered} [--at ISO8601]
   list     [--kind K]      prints the topics array as JSON
-  check-paper --deliver-at {main,HH:MM} [--as-of YYYY-MM-DD]
+  check-paper --deliver-at {main,HH:MM} [--as-of {YYYY-MM-DD,today}]
                            validates one paper's three-item news roster
   finalize-edition <edition.json> [--at ISO8601]
                            stamps only carried topics after a successful post
@@ -71,6 +71,7 @@ from contextlib import contextmanager
 from datetime import date, datetime, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "pt-shared" / "scripts"))
+from owner_time import owner_today  # noqa: E402
 from pt_paths import pt_home  # noqa: E402
 
 TOPICS_FILE = "topics.json"
@@ -278,6 +279,9 @@ def cmd_check_paper(args):
         sys.exit(f"error: --deliver-at {args.deliver_at!r} is not main or HH:MM")
     if args.main_hour is not None and not DELIVER_AT_RE.fullmatch(args.main_hour):
         sys.exit(f"error: --main-hour {args.main_hour!r} is not HH:MM")
+    if args.as_of == "today":
+        # The owner's day, resolved here: a scheduled paper never writes a date itself.
+        args.as_of = owner_today().isoformat()
     if args.as_of is not None:
         if not RUN_ON_RE.fullmatch(args.as_of):
             sys.exit(f"error: --as-of {args.as_of!r} is not YYYY-MM-DD")
@@ -513,7 +517,7 @@ def main(argv=None):
     p_check.add_argument("--deliver-at", required=True,
                          help="main or the focused paper's HH:MM")
     p_check.add_argument("--as-of", default=None,
-                         help="YYYY-MM-DD; include assignments due by this day")
+                         help="YYYY-MM-DD or today (the owner's day); include assignments due by it")
     p_check.add_argument("--main-hour", default=None,
                          help="prospective HH:MM when validating a setting change")
     p_check.set_defaults(func=cmd_check_paper)

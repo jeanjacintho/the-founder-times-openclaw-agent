@@ -69,10 +69,10 @@ test("provider and optional MCP use environment references, never credential val
   assert.equal(renderConfig(identity, "http://api:8000").mcp, undefined);
 });
 
-test("Kimi K2.5 falls back to Sonnet, then Opus, on the Plow provider with explicit capacity and pricing", () => {
+test("GLM 5.2 falls back to Sonnet, then Opus, on the Plow provider with explicit capacity and pricing", () => {
   const config = renderConfig(identity, "http://api:8000");
   assert.deepEqual(config.agents.defaults.model, {
-    primary: "plow/moonshotai/kimi-k2.5", fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"],
+    primary: "plow/z-ai/glm-5.2", fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"],
   });
   // contextWindow 262144: the Kimi K2.5 window in OpenClaw's own provider catalog
   // (moonshotai/kimi-k2.5); cost is what the Plow gateway billed on a measured call.

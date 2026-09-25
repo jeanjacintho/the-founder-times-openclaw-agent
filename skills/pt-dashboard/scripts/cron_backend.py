@@ -28,7 +28,7 @@ import subprocess
 COMMAND_TIMEOUT_SECONDS = 600
 
 OPENCLAW = ["node", "/app/openclaw.mjs"]
-MODEL = "plow/moonshotai/kimi-k2.5"
+MODEL = "plow/z-ai/glm-5.2"
 
 
 class Job(dict):

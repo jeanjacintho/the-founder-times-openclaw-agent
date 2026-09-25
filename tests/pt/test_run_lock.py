@@ -152,3 +152,23 @@ def test_a_lock_that_goes_stale_mid_wait_is_taken_over(pt_home, monkeypatch):
 def test_negative_wait_is_refused(pt_home):
     with pytest.raises(SystemExit):
         out(["acquire", "--name", "paper-workspace-2026-09-24", "--wait-seconds", "-1"])
+
+
+def test_today_names_the_lock_for_the_owners_day(pt_home, monkeypatch):
+    # The owner's day, not the container's: 23:30 UTC is already the 25th in Kiritimati.
+    pt_home.mkdir(parents=True, exist_ok=True)
+    (pt_home / "config.json").write_text('{"owner": {"timezone": "Pacific/Kiritimati"}}')
+    monkeypatch.setattr(lock, "owner_today", lambda: __import__("datetime").date(2026, 9, 25))
+    assert out(["acquire", "--name", "paper-workspace", "--today"]) == (0, "acquired")
+    assert (pt_home / "run" / "paper-workspace-2026-09-25.lock").is_file()
+    assert out(["acquire", "--name", "paper-workspace", "--today"]) == (0, "held")
+    assert out(["release", "--name", "paper-workspace", "--today"]) == (0, "released")
+    assert not (pt_home / "run" / "paper-workspace-2026-09-25.lock").exists()
+
+
+def test_today_uses_the_real_owner_clock(pt_home):
+    pt_home.mkdir(parents=True, exist_ok=True)
+    (pt_home / "config.json").write_text('{"owner": {"timezone": "UTC"}}')
+    from datetime import datetime, timezone
+    out(["acquire", "--name", "paper-workspace", "--today"])
+    assert (pt_home / "run" / f"paper-workspace-{datetime.now(timezone.utc).date().isoformat()}.lock").is_file()
