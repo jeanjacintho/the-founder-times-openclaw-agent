@@ -24,7 +24,7 @@ import json
 import subprocess
 
 OPENCLAW = ["node", "/app/openclaw.mjs"]
-MODEL = "plow/z-ai/glm-5.2"
+MODEL = "plow/moonshotai/kimi-k2.5"
 
 
 class Job(dict):
