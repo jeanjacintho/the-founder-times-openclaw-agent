@@ -166,7 +166,9 @@ HTML.** Hand-write `edition.json` under the run directory:
   `priority.configured: true`: always a `"desk": "priority"` section.** Copy
   its `priority` object from `run/desk-priority/tournament.json` without rewriting. An
   on-demand copy reusing an older checkpoint also sets the section's `"as_of"` to that
-  checkpoint's `date`; the card then prints "Advice from <date>". If that
+  checkpoint's `date` (on that section, not the edition); the card then prints "Advice from
+  <date>". Never edit a checkpoint's `date` or render from a re-dated copy: that prints old
+  advice as today's. If that
   complete checkpoint is missing, or the **As of** date in
   `pt/advisor.md` is not today (on demand: not the reused checkpoint's `as_of`), write the
   unavailable section instead: a one-line `body` saying today's card could not be built, and

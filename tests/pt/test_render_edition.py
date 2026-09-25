@@ -198,6 +198,19 @@ class TestValidate:
             render.validate_tournament(recommendation_edition(), checkpoint)
         )
 
+    def test_an_older_checkpoint_refusal_names_the_as_of_fix(self):
+        # Measured live 2026-09-25: the bare refusal led a model to copy the
+        # checkpoint with today's date, printing yesterday's advice as today's.
+        checkpoint = {**tournament(), "date": "2026-09-10"}
+        result = render.validate_tournament(recommendation_edition(), checkpoint)
+        assert '"as_of": "2026-09-10"' in result
+        assert "priority section" in result and "never edit" in result
+
+    def test_edition_level_as_of_is_refused_toward_the_priority_section(self):
+        page = recommendation_edition()
+        page["as_of"] = "2026-09-10"
+        assert "as_of belongs on the priority section" in render.validate(page)
+
     def test_on_demand_copy_reuses_an_older_checkpoint_and_says_so(self):
         page = recommendation_edition()
         page["sections"][0]["as_of"] = "2026-09-10"
