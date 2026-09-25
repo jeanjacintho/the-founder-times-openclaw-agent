@@ -295,7 +295,7 @@ class TestArgv:
         assert argv[argv.index("--tz") + 1] == TZ
         assert argv[argv.index("--session") + 1] == "isolated"
         assert argv[argv.index("--message") + 1] == sub["prompt"]
-        assert argv[argv.index("--model") + 1] == "plow/moonshotai/kimi-k2.5"
+        assert argv[argv.index("--model") + 1] == "plow/z-ai/glm-5.2"
         assert "--no-deliver" in argv and "--exact" in argv and "--json" in argv
         assert "--announce" not in argv and "--token" not in argv
 
@@ -335,7 +335,7 @@ def registered_like_spec(topics_list, **overrides):
     """Rows exactly as a previous run of this script would have left them."""
     return [row(j["name"], expr=j["schedule"] if j["tz"] else None,
                 at=None if j["tz"] else j["schedule"], tz=j["tz"], message=j["prompt"],
-                model="plow/moonshotai/kimi-k2.5", **overrides)
+                model="plow/z-ai/glm-5.2", **overrides)
             for j in crons.desired_jobs(topics_list, "07:00", TZ)] + [deliver_row()]
 
 
@@ -500,7 +500,7 @@ class TestExtraDailyHours:
             [topic("t_1", kind="section")], "03:00", TZ, 45, extra_hours=["10:30"],
         )
         prompt = jobs[1]["prompt"]
-        assert "paper-workspace-<today's date" in prompt
+        assert "--name paper-workspace --today" in prompt
         assert "post_to_chat.py" in prompt
         assert "NO_REPLY" not in prompt
 
@@ -572,7 +572,7 @@ class TestFocusedPapers:
         assert jobs[1]["schedule"] == "30 12 * * *"
         assert jobs[2]["schedule"] == "0 18 * * *"
         assert "deliver_at is 12:30" in jobs[1]["prompt"]
-        assert "paper-workspace-<today's date" in jobs[1]["prompt"]
+        assert "--name paper-workspace --today" in jobs[1]["prompt"]
         assert "NO_REPLY" not in jobs[1]["prompt"]
 
     def test_deliver_at_equal_to_main_hour_rides_the_daily_job(self):
@@ -687,7 +687,7 @@ class TestDrift:
         assert crons.job_drift(self.JOB, self.spec(expr="15 6 * * *", tz=TZ, model="plow/anthropic/claude-opus-5")) is True
 
     def test_matching_spec_is_not_drift(self):
-        spec = self.spec(expr="15 6 * * *", tz=TZ, message="same", model="plow/moonshotai/kimi-k2.5")
+        spec = self.spec(expr="15 6 * * *", tz=TZ, message="same", model="plow/z-ai/glm-5.2")
         assert crons.job_drift(self.JOB, spec) is False
 
     def test_absent_fields_are_not_drift(self):
@@ -840,7 +840,7 @@ class TestRunPromptsDelegateDelivery:
 
     def test_all_papers_share_a_lock_longer_than_the_tournament(self):
         for prompt in (crons.paper_prompt("07:00"), crons.paper_prompt(focus="12:00")):
-            assert "paper-workspace-<today's date" in prompt
+            assert "--name paper-workspace --today" in prompt
             assert "--stale-minutes 240" in prompt
 
     def test_scheduled_papers_reuse_only_todays_advice(self):
@@ -941,3 +941,12 @@ class TestDeliverJob:
         with pytest.raises(SystemExit, match="pt-deliver"):
             run_main(tmp_path, monkeypatch, [], sched)
         assert sched.writes == []
+
+
+def test_no_prompt_asks_the_model_to_work_out_a_date():
+    # A model once wrote the lock name with the wrong year and the paper never ran:
+    # the date is run_lock.py's to compute, on the owner's clock.
+    for prompt in (crons.paper_prompt(), crons.paper_prompt(hold_until="09:30", lead_minutes=150)):
+        assert "<today" not in prompt and "<date>" not in prompt
+        assert prompt.count("--name paper-workspace --today") == 3  # acquire, release on refusal, release
+    assert "check-paper --deliver-at main --as-of today" in crons.paper_prompt()

@@ -109,7 +109,7 @@ once. The wiki is `~/Plow/wiki/projects/theplowtimes/`.
   its answer; groups get answers, never setup questions.
 - **Schedule.** Every paper is an OpenClaw scheduler job
   (`openclaw cron`), registered by `pt-dashboard/scripts/register_crons.py`
-  from your topics: an isolated turn on `moonshotai/kimi-k2.5`, in **your**
+  from your topics: an isolated turn on `z-ai/glm-5.2`, in **your**
   timezone (`--tz`), with no automatic delivery — the paper posts itself as a
   PDF. Jobs live in the state volume and survive restarts and
   `docker compose up --build`; on a fresh volume, setup (or any schedule

@@ -353,6 +353,16 @@ class TestCheckPaper:
                          "--main-hour", "12:00"])
 
 
+    def test_as_of_today_is_the_owners_day_not_a_date_the_model_wrote(self, pt_home, monkeypatch):
+        # A model once wrote last year into a date the scheduled paper passed on.
+        seen = {}
+        monkeypatch.setattr(topics, "owner_today", lambda: __import__("datetime").date(2026, 9, 25))
+        monkeypatch.setattr(topics, "paper_items",
+                            lambda _t, _slot, *, main_hour=None, as_of=None: seen.setdefault("as_of", as_of) and [])
+        topics.main(["check-paper", "--deliver-at", "main", "--as-of", "today"])
+        assert seen["as_of"] == "2026-09-25"
+
+
 class TestSectionsDoNotDuplicate:
     """A `section` is evergreen, so adding one twice is never a second beat.
 

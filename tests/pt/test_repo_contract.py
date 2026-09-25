@@ -1116,12 +1116,12 @@ class TestDeployment:
 
     def test_base_config_pins_the_paper_model_and_its_limits(self):
         config = (REPO / "boot" / "config.ts").read_text()
-        assert 'primary: "plow/moonshotai/kimi-k2.5"' in config
+        assert 'primary: "plow/z-ai/glm-5.2"' in config
         # Scheduled papers run on the primary too: the cron backend pins the same model.
         backend = (ROOT / "pt-dashboard" / "scripts" / "cron_backend.py").read_text()
-        assert 'MODEL = "plow/moonshotai/kimi-k2.5"' in backend
+        assert 'MODEL = "plow/z-ai/glm-5.2"' in backend
         soul = (AGENTS).read_text()
-        assert "`moonshotai/kimi-k2.5`" in soul and "glm" not in soul.lower()
+        assert "`z-ai/glm-5.2`" in soul and "kimi" not in soul.lower()
         assert 'fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"]' in config
         assert "contextTokens: 400_000" in config
         assert 'pathPrepend: ["/opt/plow/pt-venv/bin"]' in config

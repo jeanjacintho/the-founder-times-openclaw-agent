@@ -20,7 +20,8 @@ export function renderConfig(identity: Identity, apiBase: string) {
       baseUrl: `${apiBase}/v1`, apiKey: "${PLOW_AGENT_TOKEN}", api: "openai-completions", authHeader: true,
       request: { allowPrivateNetwork: true },
       models: [
-        // Primary since 2026-09-24, to spend fewer tokens. contextWindow is the Kimi K2.5
+        // Kimi K2.5 was primary 2026-09-24/25 and is kept, not used: GLM 5.2 carries the
+        // batch reasoning of the advisor tournament more cheaply. contextWindow is the Kimi
         // window in OpenClaw's provider catalog; cost is what the Plow gateway billed.
         // It is a reasoning model and the gateway streams its thinking as reasoning_content:
         // unmarked, OpenClaw drops those deltas, so a long think reads as idle (aborted at
@@ -42,7 +43,7 @@ export function renderConfig(identity: Identity, apiBase: string) {
       // The paper's AGENTS.md plus up to 8,000 characters of Latch instructions is
       // past OpenClaw's 20,000-character default; truncation drops its last rules.
       bootstrapMaxChars: 40_000,
-      model: { primary: "plow/moonshotai/kimi-k2.5", fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"] }, sandbox: { mode: "off" },
+      model: { primary: "plow/z-ai/glm-5.2", fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"] }, sandbox: { mode: "off" },
       // The advisor tournament spawns up to six critics at once; children never spawn.
       // Delegation stays a suggestion so owner chat turns are not pushed into sub-agents.
       subagents: { maxChildrenPerAgent: 6, maxConcurrent: 6, maxSpawnDepth: 1, delegationMode: "suggest" },

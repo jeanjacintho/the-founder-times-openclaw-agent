@@ -10,8 +10,13 @@ agent must never do. The scheduler has no dedup, so the lock is a file
 created with O_EXCL: the atomic primitive every process on the host agrees
 on.
 
-  acquire --name NAME [--stale-minutes N] [--wait-seconds N]
-  release --name NAME
+  acquire --name NAME [--today] [--stale-minutes N] [--wait-seconds N]
+  release --name NAME [--today]
+
+`--today` appends `-YYYY-MM-DD`, the owner's day on the owner's clock
+(owner_time.py), so a paper's lock is `paper-workspace-2026-09-25` without
+the model working out a date: one once wrote last year and the paper never
+ran. Pass it to both acquire and release.
 
 `acquire` prints exactly one word and always exits 0, so a cron-fired
 session reads the decision instead of a status code:
@@ -46,6 +51,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
+from owner_time import owner_today
 from pt_paths import pt_home
 
 DEFAULT_STALE_MINUTES = 120
@@ -152,17 +158,21 @@ def main(argv=None):
 
     acq = sub.add_parser("acquire", help="take the run lock if free")
     acq.add_argument("--name", required=True)
+    acq.add_argument("--today", action="store_true", help="append the owner's date to NAME")
     acq.add_argument("--stale-minutes", type=int, default=DEFAULT_STALE_MINUTES)
     acq.add_argument("--wait-seconds", type=_seconds, default=0)
     acq.set_defaults(func=lambda a: acquire(a.name, a.stale_minutes, a.wait_seconds))
 
     rel = sub.add_parser("release", help="drop the run lock")
     rel.add_argument("--name", required=True)
+    rel.add_argument("--today", action="store_true", help="append the owner's date to NAME")
     rel.set_defaults(func=lambda a: release(a.name))
 
     args = parser.parse_args(argv)
     if not NAME_RE.fullmatch(args.name):
         sys.exit(f"error: --name {args.name!r} has characters not allowed in a lock name")
+    if args.today:
+        args.name = f"{args.name}-{owner_today().isoformat()}"
     return args.func(args)
 
 

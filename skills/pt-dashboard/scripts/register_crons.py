@@ -153,7 +153,7 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
     and topic finalization are pt-edition step 2's, never restated here.
     """
     if focus is None:
-        title, check = "the daily edition", "--deliver-at main --as-of <today's YYYY-MM-DD>"
+        title, check = "the daily edition", "--deliver-at main --as-of today"
         roster = (
             "every active news section with no deliver_at (or deliver_at "
             "equal to delivery.hour in pt/config.json — skip sections that belong "
@@ -191,8 +191,8 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
     )
     return (
         f"Run {title} now, in one session. First run {lock} acquire "
-        f"--name {WORKSPACE_LOCK}-<today's date in the owner's "
-        f"zone> --stale-minutes {STALE_RUN_MINUTES + lead_minutes}{wait}; if its output is 'held', "
+        f"--name {WORKSPACE_LOCK} --today --stale-minutes {STALE_RUN_MINUTES + lead_minutes}{wait}; "
+        f"if its output is 'held', "
         f"{held}. Then "
         f"/opt/plow/skills/pt-shared/scripts/prepare_daily_run.py --preserve-priority "
         f"(it archives prior scratch after the lock; do not inspect or reuse old run files). Then "
@@ -200,13 +200,13 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
         f"(delivered sections are yesterday's paper, not a skip). Run "
         f"/opt/plow/skills/pt-intake/scripts/topics.py check-paper {check}. "
         f"If it refuses, repeat its named roster, run {lock} "
-        f"release --name the same {WORKSPACE_LOCK}-<date>, and stop before research. "
+        f"release --name {WORKSPACE_LOCK} --today, and stop before research. "
         f"Then run pt-research: first the priority desk exactly as "
         f"pt-research/references/desks.md says ({advice}), "
         f"then every other standing desk it lists, in its order, then {roster}. "
         f"Then run pt-edition for the batch, delivering with post_to_chat.py "
         f"per pt-edition/SKILL.md step 2{hold}. "
-        f"Release the lock with {lock} release --name the same {WORKSPACE_LOCK}-<date>."
+        f"Release the lock with {lock} release --name {WORKSPACE_LOCK} --today."
     )
 
 
