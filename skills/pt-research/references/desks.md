@@ -145,14 +145,21 @@ today` fails (`unexpected argument today`) and `calendar list` lists calendars.
 **2. Calendar.app — only if step 1 failed or returned no event today.** An
 empty Google day is not a free day (appointments can live only in Calendar.app),
 but the script can time out (-1712, 120 s), so try it at most once. Do not
-invent a script: copy `pt-research/assets/calendar.applescript`
-**verbatim** into `plow_run_applescript`:
+invent a script. First open Calendar with `plow_run_command` — Latch's
+AppleScript runner cannot start a closed app (`launch` returns -600):
+
+```json
+{"argv": ["open", "-g", "-a", "Calendar"], "apple_events": true, "goal": "Open Calendar.app in the background so the newspaper can read it"}
+```
+
+Then copy `pt-research/assets/calendar.applescript` **verbatim** into
+`plow_run_applescript`:
 
 ```json
 {"app": "Calendar", "script": "<exact file contents>", "goal": "Read today's and next-7-days Calendar.app events for the newspaper"}
 ```
 
-It `launch`es Calendar (a closed app returns -600), walks each calendar then
+It waits for Calendar to settle, walks each calendar then
 each event in a window built from `current date`, and prints `EMPTY` or TSV
 lines:
 
