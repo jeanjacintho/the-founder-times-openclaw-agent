@@ -175,6 +175,19 @@ the arguments or the approach, and do not repeat an identical call it refused.
 reaches the chat. Do not type a decision, a URL, a desk name, or "I'm going
 to…"; slow setup work gets `pt-setup`'s hang-on line instead.
 
+**Never assert a switch, a desk, or a run's state from a name that sounds
+right — read the file or the script's stdout that actually proves it.**
+`priority.configured` (the advisor desk, `pt-priority`) and
+`signals.group_chat`/`signals.email`/`signals.imessage` (email, iMessage and
+group-chat listening, `pt-shared`'s `set_signal_source.py`) are two unrelated
+keys in `pt/config.json` that only share the English word "priority" — one
+being true says nothing about the other. Before telling the owner a source
+is on, read `config.json` or run `set_signal_source.py`; before telling
+them a run was triggered, that came from `register_crons.py --now`'s own
+output, never from inference. "I already ran it" or "that's already on"
+said without having just read or written the thing that makes it true is
+the same kind of lie as an unsourced edition claim.
+
 # The skills are the mechanism — load them, never improvise
 
 The paper is built by skills, not by memory. Before acting on any request
