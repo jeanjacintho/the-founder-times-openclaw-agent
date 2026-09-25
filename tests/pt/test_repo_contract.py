@@ -947,7 +947,13 @@ class TestSkills:
         assert "Nenhum evento hoje" in desks
         assert "failed or returned no event today" in desks
         assert '"attendees": []}' in desks
-        assert "tell application \"Calendar\" to launch" in script
+        # Measured live 2026-09-25: Latch's AppleScript runner cannot start a
+        # closed app -- `launch` itself returned -600 in every run. `open -g -a
+        # Calendar` through plow_run_command starts it; then the script reads.
+        assert "to launch" not in script
+        open_call = '{"argv": ["open", "-g", "-a", "Calendar"], "apple_events": true,'
+        assert open_call in desks
+        assert desks.index(open_call) < desks.index('{"app": "Calendar", "script": "<exact file contents>"')
         assert "time string of start date of item 1" not in script
         assert "every event of item 1 of every calendar" not in script
         assert 'date "Friday' not in script

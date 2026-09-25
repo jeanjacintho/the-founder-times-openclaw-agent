@@ -4,7 +4,9 @@
 -- Measured live 2026-09-18 on the owner's Mac:
 --   1. Querying Calendar.app while it is closed returns
 --      "Application isn't running" (-600) and the desk wrote an empty day.
---      `launch` then `delay 2` starts it.
+--      Measured again 2026-09-25: `launch` from this runner returns -600 too,
+--      so the desk opens Calendar with plow_run_command `open -g -a Calendar`
+--      first (desks.md); this script only waits for it to settle.
 --   2. Asking Calendar for "the time string of the first event of the
 --      first calendar in one whose-clause" returns -1700 (Can't make
 --      that into a type specifier). Walk each calendar, then each event
@@ -14,7 +16,6 @@
 --   4. No `try`: a swallowed calendar error printed EMPTY, which reads as a
 --      free day. An error fails the call so the desk says it could not read.
 
-tell application "Calendar" to launch
 delay 2
 
 set NL to linefeed
