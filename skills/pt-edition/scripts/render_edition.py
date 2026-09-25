@@ -167,6 +167,9 @@ def validate(edition):
     if location is not None and not isinstance(location, str):
         failures.append("location is not a string")
 
+    if "as_of" in edition:
+        failures.append('as_of belongs on the priority section ("desk": "priority"), not the edition')
+
     sections = edition.get("sections")
     if not isinstance(sections, list):
         return "; ".join(failures + ["sections is not a list"])
@@ -408,7 +411,11 @@ def validate_tournament(edition, tournament):
     generation = tournament.get("generation")
     failures = []
     if tournament.get("date") != advice_date(edition):
-        failures.append("tournament date does not match edition date")
+        failures.append(
+            "tournament date does not match edition date; to reuse this older checkpoint, "
+            f'set "as_of": "{tournament.get("date")}" on the priority section (the card then '
+            "prints its date) -- never edit or copy the checkpoint with another date"
+        )
     elif str(advice_date(edition)) > str(edition.get("date")):
         failures.append("priority as_of is after the edition date")
     if (
