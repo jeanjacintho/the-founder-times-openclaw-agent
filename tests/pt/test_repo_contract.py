@@ -1122,14 +1122,20 @@ class TestDeployment:
 
     def test_base_config_pins_the_paper_model_and_its_limits(self):
         config = (REPO / "boot" / "config.ts").read_text()
-        assert 'primary: "plow/z-ai/glm-5.2"' in config
-        # Scheduled papers run on the primary too: the cron backend pins the same model.
+        assert 'primary: "plow/openai/gpt-6-luna", fallbacks: []' in config
+        assert '{ id: "openai/gpt-6-luna", name: "GPT-6 Luna", input: ["text", "image"], contextWindow: 1050000' in config
+        assert 'models: [\n        { id: "openai/gpt-6-luna"' in config
+        retired_models = (
+            "moonshotai/kimi-k2.5", "z-ai/glm-5.2",
+            "anthropic/claude-opus-5", "anthropic/claude-sonnet-5",
+        )
+        for retired_model in retired_models:
+            assert retired_model not in config
+        # Scheduled papers are pinned to the same sole model as the chat agent.
         backend = (ROOT / "pt-dashboard" / "scripts" / "cron_backend.py").read_text()
-        assert 'MODEL = "plow/z-ai/glm-5.2"' in backend
+        assert 'MODEL = "plow/openai/gpt-6-luna"' in backend
         soul = (AGENTS).read_text()
-        assert "`z-ai/glm-5.2`" in soul and "kimi" not in soul.lower()
-        assert 'fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"]' in config
-        assert "contextTokens: 400_000" in config
+        assert "GPT-6 Luna (`openai/gpt-6-luna`)" in soul
         assert 'pathPrepend: ["/opt/plow/pt-venv/bin"]' in config
         assert 'deny: ["ask_user", "secrets"]' in config
         assert 'profile: "messaging"' in config
