@@ -1,10 +1,11 @@
 The Founder Times
-Copyright (c) 2026 The Plow Collective, Inc
+Copyright (c) 2026 Jean Jacintho
 
 This product is built on the Plow base image for OpenClaw,
-plow-pbc/plow-openclaw-agent at commit 5430d2e,
+plow-pbc/plow-openclaw-agent at commit 1e73c82,
 developed at The Plow Collective, Inc (https://plow.co).
 
 The newspaper skills, their tests and the Agent Index assets come from
 the-plow-times-hermes-agent at commit 2c46b09, the Hermes edition of
-The Founder Times (inspired by Mayfield).
+The Founder Times (inspired by Mayfield). Those files are
+Copyright (c) 2026 The Plow Collective, Inc, under the MIT License.
