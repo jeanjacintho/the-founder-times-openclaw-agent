@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { renderConfig, type Identity } from "../boot/config.ts";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test, type TestContext } from "node:test";
+import JSON5 from "json5";
+import { renderConfig, syncConfig, type Identity } from "../boot/config.ts";
 
 const identity: Identity = {
   agent: { name: "Juniper" },
@@ -10,6 +14,12 @@ const identity: Identity = {
     { type: "member", role: "owner", uid: "mem_owner" },
   ] }],
 };
+
+async function configFixture(t: TestContext) {
+  const dir = await mkdtemp(join(tmpdir(), "plow-config-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  return { path: join(dir, "openclaw.json"), includes: join(dir, "includes") };
+}
 
 test("only the owner's phone DM becomes main; other peers and groups stay isolated", () => {
   const config = renderConfig(identity, "http://api:8000");
@@ -64,9 +74,10 @@ test("provider and optional MCP use environment references, never credential val
   const config = renderConfig({ ...identity, mcp_url: "http://api:8000/relay" }, "http://api:8000");
   assert.equal(config.models.providers.plow.apiKey, "${PLOW_AGENT_TOKEN}");
   assert.equal(config.models.providers.plow.baseUrl, "http://api:8000/v1");
-  assert.equal(config.gateway.auth.token, "${OPENCLAW_GATEWAY_TOKEN}");
+  assert.equal(config.gateway.auth.mode, "trusted-proxy");
+  assert.equal("password" in config.gateway.auth, false);
   assert.equal(config.mcp?.servers.plow.url, "http://127.0.0.1:18790/mcp");
-  assert.equal(renderConfig(identity, "http://api:8000").mcp, undefined);
+  assert.deepEqual(renderConfig(identity, "http://api:8000").mcp, { sessionIdleTtlMs: 300_000 });
 });
 
 test("GPT-6 Luna is the only configured model, with explicit capacity and pricing", () => {
@@ -105,7 +116,7 @@ test("phone turns cannot block on ask_user or read secrets", () => {
 
 test("native messaging retains local workspace and memory file tools", () => {
   assert.deepEqual(renderConfig(identity, "http://api:8000").tools, {
-    profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "plow_start_thread", "plow_record_signal"], deny: ["ask_user", "secrets"],
+    profile: "messaging", toolSearch: false, sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "plow_start_thread", "plow_record_signal"], deny: ["ask_user", "secrets"],
     exec: { pathPrepend: ["/opt/plow/pt-venv/bin"] },
   });
 });
@@ -128,9 +139,9 @@ for (const name of [undefined, null, "", "  "]) test(`missing agent name is not 
   assert.throws(() => renderConfig({ ...identity, agent: { name } }, "http://api:8000"), /no usable agent.name/);
 });
 
-test("the base image uses boot-owned config without the OpenClaw browser UI", () => {
+test("the base image uses boot-owned config with the OpenClaw browser UI", () => {
   const config = renderConfig(identity, "http://api:8000");
-  assert.equal(config.gateway.controlUi?.enabled, false);
+  assert.equal(config.gateway.controlUi.enabled, true);
   assert.equal(config.agents.defaults.skipBootstrap, true);
   assert.deepEqual(config.meta, {});
 });
@@ -140,4 +151,81 @@ test("the Plow plugin may register its setup-gate prompt hook", () => {
     load: { paths: ["/opt/plow/plugin"] },
     entries: { plow: { enabled: true, hooks: { allowConversationAccess: true } } },
   });
+});
+
+test("the dashboard uses the proxy's port and accepts origins checked by the proxy", () => {
+  const config = renderConfig(identity, "http://api:8000");
+  assert.deepEqual(config.gateway, {
+    mode: "local", bind: "loopback", port: 3000,
+    controlUi: { enabled: true, allowedOrigins: ["*"] },
+    auth: { mode: "trusted-proxy", trustedProxy: {
+      userHeader: "x-plow-user", allowLoopback: true,
+      deviceAutoApprove: { enabled: true, scopes: ["operator.admin"] },
+    } },
+    trustedProxies: ["127.0.0.1"],
+    reload: { mode: "off" },
+  });
+});
+
+test("fresh boot seeds owner defaults and external includes for Plow-owned settings", async t => {
+  const { path, includes } = await configFixture(t);
+  await syncConfig(renderConfig(identity, "http://api:8000"), path, includes);
+  const owner = JSON5.parse(await readFile(path, "utf8"));
+  assert.deepEqual(owner.meta, {});
+  assert.deepEqual(owner.agents.defaults, { $include: join(includes, "agent-defaults.json5") });
+  assert.equal(JSON5.parse(await readFile(join(includes, "agent-defaults.json5"), "utf8")).model.primary, "plow/openai/gpt-6-luna");
+  assert.deepEqual(owner.skills, { $include: join(includes, "skills.json5") });
+  assert.equal(JSON5.parse(await readFile(join(includes, "skills.json5"), "utf8")).load.extraDirs[0], "/opt/plow/skills");
+  assert.deepEqual(owner.gateway, { $include: join(includes, "gateway.json5") });
+  assert.equal(owner.bindings.length, 2);
+  assert.deepEqual(owner.bindings[0], { $include: join(includes, "binding.json5") });
+  assert.deepEqual(owner.bindings[1].match.peer, { kind: "group", id: "*" });
+  assert.deepEqual(JSON5.parse(await readFile(join(includes, "gateway.json5"), "utf8")).port, 3000);
+});
+
+test("restart migrates a full render and keeps owner edits outside Plow-owned paths", async t => {
+  const { path, includes } = await configFixture(t);
+  const old = renderConfig(identity, "http://old-api:8000") as Record<string, any>;
+  old.channels.telegram = { enabled: true };
+  old.models.providers.extra = { baseUrl: "https://example.com" };
+  old.plugins.entries.extra = { enabled: true };
+  old.agents.defaults.model.primary = "extra/model";
+  old.agents.entries.main.identity.emoji = "old";
+  old.bindings.unshift({ agentId: "extra", match: { channel: "telegram" } });
+  await writeFile(path, `// owner settings\n${JSON.stringify(old)}\n`);
+  await syncConfig(renderConfig(identity, "http://new-api:8000"), path, includes);
+  const owner = JSON5.parse(await readFile(path, "utf8"));
+  assert.deepEqual(owner.channels.telegram, { enabled: true });
+  assert.deepEqual(owner.models.providers.extra, { baseUrl: "https://example.com" });
+  assert.deepEqual(owner.plugins.entries.extra, { enabled: true });
+  // The paper owns its model: an owner edit there does not survive a restart.
+  assert.deepEqual(owner.agents.defaults, { $include: join(includes, "agent-defaults.json5") });
+  assert.deepEqual(owner.agents.entries.main.identity, { $include: join(includes, "identity.json5") });
+  assert.equal(owner.bindings.length, 3);
+  assert.deepEqual(owner.bindings[0], { $include: join(includes, "binding.json5") });
+  assert.deepEqual(owner.bindings[1], { agentId: "extra", match: { channel: "telegram" } });
+  assert.deepEqual(owner.bindings[2].match.peer, { kind: "group", id: "*" });
+  assert.equal(JSON5.parse(await readFile(join(includes, "plow-provider.json5"), "utf8")).baseUrl, "http://new-api:8000/v1");
+  owner.gateway.port = 9999;
+  owner.channels.plow.enabled = false;
+  await writeFile(path, JSON.stringify(owner));
+  await syncConfig(renderConfig(identity, "http://newer-api:8000"), path, includes);
+  const again = JSON5.parse(await readFile(path, "utf8"));
+  assert.deepEqual(again.gateway, { $include: join(includes, "gateway.json5") });
+  assert.deepEqual(again.channels.plow, { $include: join(includes, "plow-channel.json5") });
+  assert.deepEqual(again.channels.telegram, { enabled: true });
+  assert.equal(again.bindings.length, 3);
+});
+
+test("MCP Plow server include disappears without a relay while owner MCP settings remain", async t => {
+  const { path, includes } = await configFixture(t);
+  await syncConfig(renderConfig({ ...identity, mcp_url: "https://relay.example" }, "http://api:8000"), path, includes);
+  const owner = JSON5.parse(await readFile(path, "utf8"));
+  owner.mcp.servers.other = { url: "https://other.example" };
+  await writeFile(path, JSON.stringify(owner));
+  await syncConfig(renderConfig(identity, "http://api:8000"), path, includes);
+  const again = JSON5.parse(await readFile(path, "utf8"));
+  assert.equal(again.mcp.servers.plow, undefined);
+  assert.deepEqual(again.mcp.servers.other, { url: "https://other.example" });
+  assert.equal(again.mcp.sessionIdleTtlMs, 300_000);
 });
