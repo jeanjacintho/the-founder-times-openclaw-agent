@@ -1182,7 +1182,7 @@ class TestDeployment:
         # login shell resolved another python3 and shipped a wall of text.
         text = self.DOCKERFILE.read_text()
         from_line = next(line for line in text.splitlines() if line.startswith("FROM "))
-        assert from_line.startswith("FROM ghcr.io/openclaw/openclaw:2026.9.4@sha256:")
+        assert from_line.startswith("FROM ghcr.io/openclaw/openclaw:2026.9.6@sha256:")
         for pin in ("ARG UV_VERSION=0.11.19", "ARG UV_SHA256_AMD64=", "ARG UV_SHA256_ARM64=",
                     "ARG PT_PYTHON_VERSION=3.13", "ARG WEASYPRINT_VERSION=62.3",
                     "ARG PYDYF_VERSION=0.10.0", "ARG PYYAML_VERSION=6.0.3"):
@@ -1205,10 +1205,11 @@ class TestDeployment:
         assert "6f3c76ebe119826a2def1ae226c3573b214d396a3ed7c477ef282b1063345b87" in text
         assert "AGENT_ID=thefoundertimes" in text
 
-    def test_license_and_notice(self):
-        assert (REPO / "LICENSE").read_text().startswith("MIT License")
-        notice = (REPO / "NOTICE").read_text()
-        assert "plow-pbc/plow-openclaw-agent" in notice and "5430d2e" in notice
+    def test_license(self):
+        text = (REPO / "LICENSE").read_text()
+        assert text.startswith("MIT License")
+        assert "Copyright (c) 2026 Jean Jacintho" in text
+        assert not (REPO / "NOTICE").exists()
 
 
 class TestImportability:

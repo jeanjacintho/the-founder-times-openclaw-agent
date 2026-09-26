@@ -176,4 +176,4 @@ The OpenClaw runtime is pinned to `2026.9.6` by image digest, as in the base.
 
 ## License
 
-MIT. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+MIT. See [LICENSE](LICENSE).
