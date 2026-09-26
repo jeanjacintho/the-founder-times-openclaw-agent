@@ -24,10 +24,10 @@ The daily schedule is computed in minutes, so `00:00 − 0min` is `0 0 * * *`
 `00:00 − 20min`, is refused: that run would be the previous day's paper.
 
 Every row is an agent turn in an **isolated** session, on
-`plow/z-ai/glm-5.2` (the gateway's primary), with delivery **none**: the scheduler never
-posts the run's final text anywhere. The edition itself is posted mid-run as
-the PDF plus any chat-only mail/sports companion (`post_to_chat.py --pdf
---text-file`), to the owner's DM (`PLOW_HOME_CHANNEL`, or `owner_chat.py`
+`plow/openai/gpt-6-luna` (the gateway's only configured model), with delivery
+**none**: the scheduler never posts the run's final text anywhere. The edition
+itself is posted mid-run as the PDF plus any chat-only mail/sports companion
+(`post_to_chat.py --pdf --text-file`), to the owner's DM (`PLOW_HOME_CHANNEL`, or `owner_chat.py`
 when boot did not know it yet). Every cron row carries `--tz` =
 `owner.timezone`, so the scheduler fires on the owner's own wall clock,
 daylight saving included; one-shots carry an ISO time with its offset.

@@ -69,29 +69,14 @@ test("provider and optional MCP use environment references, never credential val
   assert.equal(renderConfig(identity, "http://api:8000").mcp, undefined);
 });
 
-test("GLM 5.2 falls back to Sonnet, then Opus, on the Plow provider with explicit capacity and pricing", () => {
+test("GPT-6 Luna is the only configured model, with explicit capacity and pricing", () => {
   const config = renderConfig(identity, "http://api:8000");
   assert.deepEqual(config.agents.defaults.model, {
-    primary: "plow/z-ai/glm-5.2", fallbacks: ["plow/anthropic/claude-sonnet-5", "plow/anthropic/claude-opus-5"],
+    primary: "plow/openai/gpt-6-luna", fallbacks: [],
   });
-  // contextWindow 262144: the Kimi K2.5 window in OpenClaw's own provider catalog
-  // (moonshotai/kimi-k2.5); cost is what the Plow gateway billed on a measured call.
   assert.deepEqual(config.models.providers.plow.models, [{
-    id: "moonshotai/kimi-k2.5", name: "Kimi K2.5", input: ["text"], contextWindow: 262144,
-    // A reasoning model: without this OpenClaw drops its reasoning_content deltas, so a
-    // long think looks idle (aborted at 120 s) and the next tool-call message is replayed
-    // without the reasoning_content Kimi requires (measured live 2026-09-25).
-    reasoning: true, maxTokens: 32768, compat: { requiresReasoningContentOnAssistantMessages: true },
-    cost: { input: 0.57, output: 2.85 },
-  }, {
-    id: "z-ai/glm-5.2", name: "GLM 5.2", input: ["text"], contextWindow: 1048576,
-    cost: { input: 0.5544, output: 1.7424 },
-  }, {
-    id: "anthropic/claude-opus-5", name: "Claude Opus 5", input: ["text", "image"], contextWindow: 1000000,
-    contextTokens: 400_000, cost: { input: 5.00, output: 25.00 },
-  }, {
-    id: "anthropic/claude-sonnet-5", name: "Claude Sonnet 5", input: ["text", "image"], contextWindow: 1000000,
-    cost: { input: 2.00, output: 10.00 },
+    id: "openai/gpt-6-luna", name: "GPT-6 Luna", input: ["text", "image"], contextWindow: 1050000,
+    cost: { input: 0.10, output: 0.50 },
   }]);
 });
 
