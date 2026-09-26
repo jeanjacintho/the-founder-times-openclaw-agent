@@ -172,7 +172,7 @@ npm run test:py   # newspaper scripts: pytest on Python 3.13 via uv
 npm test          # the above, then the base's tsc, node tests and offline probe in the image
 ```
 
-The OpenClaw runtime is pinned to `2026.9.4` by image digest, as in the base.
+The OpenClaw runtime is pinned to `2026.9.6` by image digest, as in the base.
 
 ## License
 

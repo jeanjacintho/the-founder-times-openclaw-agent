@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { stripTypeScriptTypes } from "node:module";
 
-for (const name of ["boot/agent-index", "boot/config", "boot/identity", "boot/newspaper-env", "boot/prompt", "boot/main", "boot/process", "boot/probe", "boot/probe-fixture", "boot/mcp-bridge", "plugin/index", "plugin/group-listen", "plugin/owner-phrases", "plugin/setup-gate", "plugin/transport"]) {
+for (const name of ["boot/agent-index", "boot/config", "boot/identity", "boot/log", "boot/newspaper-env", "boot/prompt", "boot/main", "boot/process", "boot/probe", "boot/probe-fixture", "boot/mcp-bridge", "plugin/index", "plugin/group-listen", "plugin/owner-phrases", "plugin/setup-gate", "plugin/transport"]) {
   const source = await readFile(`/opt/plow/${name}.ts`, "utf8");
   const output = name.startsWith("plugin/") ? name.replace("plugin/", "plugin/dist/") : name;
   await mkdir(`/opt/plow/${output.substring(0, output.lastIndexOf("/"))}`, { recursive: true });
