@@ -873,6 +873,8 @@ class TestSkills:
             "never contain raw private queries, selectors, URLs, or excerpts",
             "item (a re-open handle, not content)",
             "only after the renderer succeeds and `tournament.json` is atomically published",
+            "keep its `sources` a non-empty list",
+            '`["wiki", "validate", "--writer", "thefoundertimes"]`',
         ):
             assert clause in text
         desks = (ROOT / "pt-research" / "references" / "desks.md").read_text()

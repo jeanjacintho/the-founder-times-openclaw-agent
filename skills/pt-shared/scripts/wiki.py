@@ -75,13 +75,20 @@ class Wiki:
         )
         return int(result["exit_code"]), str(result.get("output") or "")
 
+    def _validate(self, writer):
+        """`wiki validate --writer <writer>`'s problem lines; exit 2 (unknown writer) raises."""
+        code, out = self.run("validate", "--writer", writer)
+        if code not in (0, 1):
+            raise LatchError(f"wiki validate --writer {writer}: {out.strip()}")
+        return out.splitlines() if code else []
+
     def check(self):
-        """`wiki validate`, then `wiki index`. Only a problem on a page this paper
-        writes fails it; another agent's page is that agent's to fix."""
-        code, out = self.run("validate")
-        ours = [line for line in out.splitlines() if line.startswith((ROOT, GOALS))]
-        if ours or code not in (0, 1):
-            raise LatchError("wiki validate: " + ("; ".join(ours) or out.strip()))
+        """`wiki validate` of this paper's root and its one shared page, then
+        `wiki index`. Another writer's page is that writer's to fix."""
+        ours = self._validate(WRITER) + [
+            line for line in self._validate("shared") if line.startswith(GOALS)]
+        if ours:
+            raise LatchError("wiki validate: " + "; ".join(ours))
         code, out = self.run("index", write=True)
         if code != 0:
             raise LatchError(f"wiki index: {out.strip()}")

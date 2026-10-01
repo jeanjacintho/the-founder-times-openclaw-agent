@@ -107,7 +107,10 @@ correction is not one the line may pin. File it under `## Goals`, `## Not now` o
 whichever fits, set `updated:` to today. Read it again immediately before the write and fold
 whatever changed since the first read into what you write — the owner edits this page in
 Obsidian, and their line is evidence of what they say, never something a pass drops. Then
-`plow__plow_write_file` it back with every other line unchanged. The confirmation is the
+`plow__plow_write_file` it back with every other line unchanged, then run argv
+`["wiki", "validate", "--writer", "shared"]` through `plow__plow_run_command`; exit 1 prints `path: problem`
+lines, and one for `entities/owner/goals.md` is this write's to fix — fix the page and validate again
+(another shared page is its writer's). The confirmation is the
 contract, not a courtesy: say the line was written and name the page; if `wiki_setup.py --desk`,
 the read, or the write fails, say that instead — never confirm as though the correction landed,
 since one the owner has to repeat is one the paper has already lost. Only the owner's own

@@ -60,8 +60,8 @@ lists it beside its siblings. Paths come from `pt_paths.py`, never a literal.
   script: nothing invokes it, the pt-* scripts import it.
 - `scripts/wiki.py` — the paper's pages in the owner's wiki (`~/Plow/wiki`, plow-wiki):
   the root `projects/thefoundertimes` (writer `thefoundertimes`), the shared
-  `entities/owner/goals.md`, the OKF page format, and `check()` = `wiki validate`
-  then `wiki index` through Latch's wiki plugin, failing only on the paper's own pages.
+  `entities/owner/goals.md`, the OKF page format, and `check()` = `wiki validate --writer`
+  (`thefoundertimes`, plus `shared` for goals.md) then `wiki index` through Latch's wiki plugin.
 - `scripts/wiki_setup.py` — make `~/Plow/wiki` ready for the paper. Bare:
   `wiki_setup.py` or `wiki_setup.py --desk`. Creates the wiki with `wiki init` when
   the Mac has none, copies an install's pages from the pre-rename root

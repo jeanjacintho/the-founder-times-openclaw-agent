@@ -279,7 +279,9 @@ Stop. On their next message:
      Obsidian, and their line is evidence of what they say, never something a pass
      drops. Then `plow__plow_write_file` it back. Every other line, frontmatter
      included, stays as it was. Never paste the page back in chat.
-  Only once the goal is on the page: `record_setup.py <config path> priority.configured=true`.
+  3. Run argv `["wiki", "validate", "--writer", "shared"]` through `plow__plow_run_command`;
+     a line for `entities/owner/goals.md` is this write's to fix — fix the page and validate again.
+  Only once the goal is on the page and validates: `record_setup.py <config path> priority.configured=true`.
   No re-openable handle for that message (issue #85's non-phone-backed line) → same as
   No, no wiki write: the goal isn't supportable, so the desk stays unconfigured rather
   than stand on nothing — the paper still prints its other desks.

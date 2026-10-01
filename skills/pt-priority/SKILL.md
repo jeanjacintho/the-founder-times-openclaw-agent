@@ -82,12 +82,15 @@ Load this skill once during Orient. Preserve any canonical
 `/var/lib/plow/pt/run/desk-priority/tournament.json` checkpoint. Name the run from its
 actual Orient invocation time as `YYYY-MM-DDTHHMM` and create
 `projects/thefoundertimes/runs/<run-datetime>/state.md`. Copy the required OKF front matter shape from
-`qa.md`, with a run-specific title and description. The page is private research state, never printed.
+`qa.md`, with a run-specific title and description; keep its `sources` a non-empty list of
+`- resource: <item>`, one per item the run's receipts rest on (start with `qa.md`'s own). The page is private research state, never printed.
 Keep its exact path in root context as
 `RUN_PAGE=~/Plow/wiki/projects/thefoundertimes/runs/<run-datetime>/state.md`; every compaction handoff preserves
 that value until delivery.
 Rewrite that one page whole after Orient and after every Challenge, Criticize, and Cull;
-do not create per-generation files or an append-only event log. It holds the stage and generation,
+do not create per-generation files or an append-only event log. After each rewrite, run argv
+`["wiki", "validate", "--writer", "thefoundertimes"]` through `plow__plow_run_command`; exit 1 prints
+`path: problem` lines — fix each page it names and validate again. It holds the stage and generation,
 champions, contenders, priority cases, sanitized reads, unknowns, critic verdicts, fact-rank moves,
 and the last complete checkpoint summary. If context is compacted, resume from this page and the
 canonical checkpoint.
@@ -313,6 +316,8 @@ Apply the final proposed Q&A and resource changes once, only after the renderer 
 Re-read each whole page and fold owner edits into it
 immediately before writing. If either write fails, retry only that wiki write from the accepted
 run-state proposal; never re-run Cull or apply another rank move.
+After both writes, run argv `["wiki", "validate", "--writer", "thefoundertimes"]` through
+`plow__plow_run_command`; exit 1 prints `path: problem` lines — fix each page it names and validate again.
 
 ## Accepted checkpoint consistency
 

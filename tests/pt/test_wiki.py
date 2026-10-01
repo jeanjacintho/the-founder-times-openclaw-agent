@@ -47,16 +47,33 @@ class TestWiki:
         w.check()
         assert (mac.home / "Plow" / "wiki" / "index.md").exists()
 
-    def test_check_fails_on_a_broken_page_of_ours(self, mac):
+    @pytest.mark.parametrize("rel, meta, field", [
+        (f"{ROOT}/x.md", {"description": None}, "description"),
+        (f"{ROOT}/runs/2026-10-01T0331/state.md", {"type": "Synthesis", "sources": None}, "sources"),
+        (GOALS, {"type": "Owner", "category": "entities", "description": None}, "description"),
+    ])
+    def test_check_fails_on_a_broken_page_of_ours(self, mac, rel, meta, field):
         declare_root(mac)
         w = Wiki(mac.call_tool)
-        w.write(f"{ROOT}/x.md", page(description=None))
-        with pytest.raises(LatchError, match=rf"{ROOT}/x.md: missing required field: description"):
+        w.write(rel, page(**meta))
+        with pytest.raises(LatchError, match=rf"{rel}: missing required field: {field}"):
             w.check()
 
-    def test_check_ignores_another_agents_broken_page(self, mac):
+    @pytest.mark.parametrize("rel, meta", [
+        ("entities/people/someone.md", {"type": "Person", "category": "entities"}),
+        ("projects/str/x.md", {}),
+    ])
+    def test_check_ignores_another_writers_broken_page(self, mac, rel, meta):
         declare_root(mac)
+        toml = mac.home / "Plow" / "wiki" / "wiki.toml"
+        toml.write_text(toml.read_text() + '\n[roots."projects/str"]\nwriter = "str"\n')
+        mac.wiki("init", "~/Plow/wiki")
         w = Wiki(mac.call_tool)
-        w.write("entities/people/someone.md", page(type="Person", category="entities", description=None))
+        w.write(rel, page(description=None, **meta))
         w.write(GOALS, page(type="Owner", category="entities"))
         w.check()
+
+    def test_check_refuses_a_wiki_that_does_not_declare_our_root(self, mac):
+        mac.wiki("init", "~/Plow/wiki")
+        with pytest.raises(LatchError, match=rf"--writer {WRITER}: no root in wiki.toml"):
+            Wiki(mac.call_tool).check()
