@@ -72,6 +72,7 @@ from zoneinfo import ZoneInfo
 from bearer_http import post_json, post_json_read, put_bytes, require
 from owner_chat import home_channel
 from owner_phrases import phrase
+import run_attempts
 from owner_time import owner_now
 from pt_paths import config_file, pt_home
 from setup_needed import owner_language
@@ -547,6 +548,11 @@ def main():
              "it is ahead, post now once it has passed (scheduled papers only)",
     )
     parser.add_argument(
+        "--clear-attempts", action="store_true",
+        help="a paper run: once the post is confirmed or the edition is staged, start the "
+             "owner's day of paper attempts over (run_attempts.py)",
+    )
+    parser.add_argument(
         "--flush-outbox", action="store_true",
         help="post every staged paper whose hour has come (the pt-deliver job)",
     )
@@ -583,12 +589,14 @@ def main():
                 due = _now() + timedelta(seconds=remaining)
                 stage(args.hold_until, due, pdf=args.pdf, text_file=args.text_file,
                       text=text, filename=args.filename)
+                if args.clear_attempts:
+                    run_attempts.clear()
                 print(f"held for {args.hold_until} — pt-deliver posts it")
                 return
             print(f"{DELIVER_JOB} is not running: posting now instead of holding for {args.hold_until}")
 
     deliver(base, uid, token, pdf=args.pdf, text=text, filename=args.filename,
-            text_file=args.text_file)
+            text_file=args.text_file, on_posted=run_attempts.clear if args.clear_attempts else None)
 
 
 def deliver(base, uid, token, *, pdf=None, text="", filename=None, text_file=None, on_posted=None):

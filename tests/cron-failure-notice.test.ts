@@ -102,3 +102,13 @@ test("paper job names in the real cron envelope include numbered daily editions"
   ] }, { jobId });
   assert.equal(sent.length, 1);
 });
+
+test("a run that stopped on a spent day does not repeat the failure notice", async t => {
+  t.mock.method(globalThis, "fetch", async () => { throw new Error("must not send"); });
+  const jobId = "9a1f1c1a-0b8f-4c52-8e0b-5f0b4a7f2d11";
+  await notifyFailedPaperRun({ runId: "run-spent-day", success: true, messages: [
+    { role: "user", content: [{ type: "text", text: `[cron:${jobId} pt-daily-edition-now] Run the daily edition. On 'give-up-quiet' release the lock and stop.` }] },
+    { role: "tool", content: [{ type: "text", text: "give-up-quiet\n" }] },
+    { role: "assistant", content: [{ type: "text", text: "NO_REPLY" }] },
+  ] }, { jobId });
+});

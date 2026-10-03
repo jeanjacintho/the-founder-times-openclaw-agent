@@ -83,12 +83,18 @@ function alreadyMessagedOwner(messages: unknown[] | undefined): boolean {
   return visit(messages);
 }
 
+// run_attempts.py prints this when the day's attempts are spent and the owner was already told:
+// the run stopped on purpose, and a second failure notice would repeat what they know.
+function stoppedOnPurpose(messages: unknown[] | undefined): boolean {
+  return (messages ?? []).some(message => textValues(message).some(text => text.trim() === "give-up-quiet"));
+}
+
 /** Alert the owner once when a paper cron ends without confirmed delivery. */
 export async function notifyFailedPaperRun(event: AgentEnd, context: AgentContext): Promise<void> {
   const runId = event.runId;
   const jobId = context.jobId;
   if (
-    deliveryWasConfirmed(event.messages) || alreadyMessagedOwner(event.messages) ||
+    deliveryWasConfirmed(event.messages) || alreadyMessagedOwner(event.messages) || stoppedOnPurpose(event.messages) ||
     !isPaperRun(event.messages, context) || !runId
   ) return;
   const key = `${jobId ?? context.sessionKey ?? context.sessionId ?? "paper"}:${runId}`;

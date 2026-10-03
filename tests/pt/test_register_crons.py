@@ -1008,8 +1008,26 @@ def test_no_prompt_asks_the_model_to_work_out_a_date():
     # the date is run_lock.py's to compute, on the owner's clock.
     for prompt in (crons.paper_prompt(), crons.paper_prompt(hold_until="09:30", lead_minutes=150)):
         assert "<today" not in prompt and "<date>" not in prompt
-        assert prompt.count("--name paper-workspace --today") == 3  # acquire, release on refusal, release
+        # acquire, release on a spent day, release on refusal, release
+        assert prompt.count("--name paper-workspace --today") == 4
     assert "check-paper --deliver-at main --as-of today" in crons.paper_prompt()
+
+
+def test_a_paper_counts_its_starts_and_gives_up_instead_of_retrying_all_day():
+    # A paper that dies on a provider rate limit is retried by OpenClaw; each retry
+    # redoes the whole paper. After the day's attempts the run stops before research.
+    scheduled = crons.paper_prompt(hold_until="09:30", lead_minutes=150)
+    on_demand = crons.paper_prompt()
+    for prompt in (scheduled, on_demand):
+        begin = prompt.index("run_attempts.py begin")
+        assert prompt.index("run_lock.py acquire") < begin < prompt.index("prepare_daily_run.py")
+        assert "'give-up'" in prompt and "'give-up-quiet'" in prompt
+        assert "exactly one short message" in prompt
+        assert "run_attempts.py delivered" not in prompt, "the count is cleared by post_to_chat.py, not by a command the model must remember"
+        assert "--clear-attempts" in prompt
+        assert "provider kept refusing" not in prompt, "the cause of the failures is not known"
+    assert "the next scheduled paper is tomorrow at 09:30" in scheduled
+    assert "they can ask again later" in on_demand
 
 
 def test_jobs_follow_the_model_boot_exports(monkeypatch):
