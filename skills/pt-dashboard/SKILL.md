@@ -73,7 +73,8 @@ Create-if-missing, so it is safe to re-run: it reads what is already
 scheduled from `openclaw cron list --all --json` (every job, disabled ones
 included — a plain `cron list` hides them) and creates only what is absent.
 It also **reconciles drift**: a registered job whose reported schedule,
-zone, prompt or model no longer matches the spec — the owner changed the
+zone, prompt, model or run budget (`--timeout-seconds`, three hours: the scheduler's own
+60-minute watchdog would otherwise abort a slow paper with its lock held) no longer matches the spec — the owner changed the
 delivery hour, the lead or their zone, the prompt's contract moved — is
 patched in place with `openclaw cron edit <id>`, never removed and
 re-created. Without that, "already present, skipped" would mean a changed
@@ -113,9 +114,10 @@ Two refusals are the whole reason this is a script and not a habit:
   if the environment still names it — equals `owner.timezone`; otherwise the
   script refuses and names how to re-state the owner's times.
 
-A disabled job is neither skipped nor duplicated: it is left alone, named
-with the command that enables it, and the run exits non-zero after
-everything else finishes.
+A disabled job is neither skipped nor duplicated: it is left disabled (but
+reconciled to the spec like any other, so enabling it later does not bring
+back an old schedule or run budget), named with the command that enables it,
+and the run exits non-zero after everything else finishes.
 
 ## Verifying an unattended run
 

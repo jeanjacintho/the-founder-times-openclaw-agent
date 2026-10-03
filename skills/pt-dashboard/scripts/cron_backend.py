@@ -27,6 +27,12 @@ import os
 import subprocess
 
 COMMAND_TIMEOUT_SECONDS = 600
+# A paper is an isolated agent turn. Left unset, the scheduler's own 60-minute
+# watchdog ends it, and the time a paper spends waiting for the workspace lock
+# (up to ~40 minutes) comes out of that same budget: a slow, rate-limited paper
+# is aborted mid-run with its lock still held. Three hours covers the tournament,
+# the research and a lock wait, and stays under the lock's own stale limit.
+PAPER_TIMEOUT_SECONDS = 10800
 
 OPENCLAW = ["node", "/app/openclaw.mjs"]
 # The chat's own model, which boot exports as PT_MODEL: Sol, on Plow unless the
@@ -64,7 +70,8 @@ class Job(dict):
         expr = schedule.get("expr") if schedule.get("kind") == "cron" else schedule.get("at")
         command = payload.get("argv") if payload.get("kind") == "command" else None
         return {"schedule": expr, "tz": schedule.get("tz"),
-                "prompt": payload.get("message"), "model": payload.get("model"), "command": command}
+                "prompt": payload.get("message"), "model": payload.get("model"), "command": command,
+                "timeout": payload.get("timeoutSeconds")}
 
 
 def _run(argv):
@@ -116,7 +123,8 @@ class CronBackend:
         return self._cron("add", "--name", job["name"], *self._schedule_args(job),
                           "--session", "isolated", "--message", job["prompt"],
                           *(["--keep-after-run"] if job["name"] == "pt-daily-edition-now" else []),
-                          "--no-deliver", "--model", job.get("model", MODEL), "--json")
+                          "--no-deliver", "--model", job.get("model", MODEL),
+                          "--timeout-seconds", str(PAPER_TIMEOUT_SECONDS), "--json")
 
     def edit_argv(self, job_id, job):
         """Patch a registered job in place -- never remove-then-create, or a
@@ -125,7 +133,8 @@ class CronBackend:
             return self._cron("edit", job_id, *self._schedule_args(job), *self._command_args(job))
         return self._cron("edit", job_id, *self._schedule_args(job),
                           "--message", job["prompt"], "--no-deliver",
-                          "--model", job.get("model", MODEL), "--json")
+                          "--model", job.get("model", MODEL),
+                          "--timeout-seconds", str(PAPER_TIMEOUT_SECONDS), "--json")
 
     def remove_argv(self, job_id):
         return self._cron("rm", job_id, "--json")

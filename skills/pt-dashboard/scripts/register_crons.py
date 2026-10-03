@@ -74,7 +74,7 @@ sys.path[:0] = [os.path.join(_SKILLS, "pt-intake", "scripts"), os.path.join(_SKI
 from record_owner_language import _write_json  # noqa: E402 -- the config's atomic writer
 from pt_paths import config_file, script  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from cron_backend import MODEL, OPENCLAW, CronBackend  # noqa: E402 -- sibling module
+from cron_backend import MODEL, OPENCLAW, PAPER_TIMEOUT_SECONDS, CronBackend  # noqa: E402 -- sibling module
 
 CONFIG_FILE = str(config_file())
 # The only job names this spec owns. Pinned as a fullmatch so a name that
@@ -107,11 +107,14 @@ DELIVER_ARGV = ["/opt/plow/pt-venv/bin/python3",
                 "/opt/plow/skills/pt-shared/scripts/post_to_chat.py", "--flush-outbox"]
 WORKSPACE_LOCK = "paper-workspace"
 DEFAULT_LEAD_MINUTES = 0
-# Every acquirer of a lock uses one lifetime: the run itself plus
-# delivery.lead_minutes, since a scheduled run holds the lock through its early
-# start and the held POST. Every paper shares the workspace lock, so a smaller
-# number could call the scheduled run dead and start a competing paper.
-STALE_RUN_MINUTES = 240
+# Every acquirer of a lock uses one lifetime. A run cannot outlive its scheduler
+# budget (cron_backend.PAPER_TIMEOUT_SECONDS), and it takes the lock no earlier
+# than it starts, so a lock older than the budget belongs to a run that is gone:
+# one killed by a model error or by the budget itself, which never reaches its
+# release. The margin covers the run's own wind-down. Every paper shares the
+# workspace lock, so nothing shorter is safe: it could call a live run dead and
+# start a competing paper.
+STALE_RUN_MINUTES = PAPER_TIMEOUT_SECONDS // 60 + 20
 # A scheduled paper that finds the workspace held (an on-demand copy runs its
 # whole ~35-minute paper under the lock) waits two rounds of this before giving
 # the day up: ~40 minutes, inside the hold-until window, each round under
@@ -216,7 +219,7 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
     return (
         f"{PAPER_RUN_MARKER} {SKILL_LOADING}"
         f"Run {title} now, in one session. First run {lock} acquire "
-        f"--name {WORKSPACE_LOCK} --today --stale-minutes {STALE_RUN_MINUTES + lead_minutes}{wait}; "
+        f"--name {WORKSPACE_LOCK} --today --stale-minutes {STALE_RUN_MINUTES}{wait}; "
         f"if its output is 'held', "
         f"{held}. Then "
         f"/opt/plow/skills/pt-shared/scripts/prepare_daily_run.py --preserve-priority "
@@ -595,9 +598,14 @@ def job_drift(job, spec):
     field is silence, not a mismatch. Schedule, zone, prompt and model are
     the fields a spec change actually moves (the delivery hour, the owner's
     zone, the lead, the delivery contract, the model the paper is tuned on).
+    The run budget is the exception: a job registered before it was set reports
+    no timeout at all, which is the scheduler's 60-minute default, so a reported
+    spec with no timeout drifts and the next register moves it.
     """
     if job.get("command") is not None:  # a command job has no prompt or model
         return spec.get("command") is not None and spec["command"] != job["command"]
+    if "timeout" in spec and spec["timeout"] != PAPER_TIMEOUT_SECONDS:
+        return True
     for key in ("schedule", "tz", "prompt", "model"):
         have = spec.get(key)
         want = job.get(key, MODEL) if key == "model" else job.get(key)
@@ -685,10 +693,14 @@ def main(argv=None, backend=None, config_path=CONFIG_FILE, env=None):
             if not current.enabled:
                 print(
                     f"WARNING: {job['name']} is registered but DISABLED -- it will "
-                    "never fire, and this leaves it alone rather than "
+                    "never fire, and this leaves it disabled rather than "
                     f"duplicating it. Enable it: {' '.join(OPENCLAW)} cron enable {current.id}"
                 )
                 paused.append(job["name"])
+                # Still brought up to the spec (budget included), so enabling it later
+                # does not bring back an old job.
+                if job_drift(job, current.spec):
+                    pending.append(("edit", job, current))
                 continue
             if not job_drift(job, current.spec):
                 print(f"already present, skipped: {job['name']}")

@@ -36,7 +36,7 @@ def write_config(tmp_path, config=CONFIG):
     return path
 
 
-def row(name, enabled=True, jid=None, expr=None, tz=None, at=None, message=None, model=None):
+def row(name, enabled=True, jid=None, expr=None, tz=None, at=None, message=None, model=None, timeout=10800):
     """One automation as `openclaw cron list --json` returns it."""
     schedule = {}
     if at is not None:
@@ -48,6 +48,8 @@ def row(name, enabled=True, jid=None, expr=None, tz=None, at=None, message=None,
         payload["message"] = message
     if model is not None:
         payload["model"] = model
+    if timeout is not None:  # None: a job registered before the budget was set
+        payload["timeoutSeconds"] = timeout
     return {"id": jid or f"id-{name}", "name": name, "enabled": enabled,
             "sessionTarget": "isolated", "schedule": schedule, "payload": payload,
             "delivery": {"mode": "none"}}
@@ -329,6 +331,7 @@ class TestArgv:
         assert argv[argv.index("--message") + 1] == sub["prompt"]
         assert argv[argv.index("--model") + 1] == "plow/openai/gpt-6-sol"
         assert "--no-deliver" in argv and "--exact" in argv and "--json" in argv
+        assert argv[argv.index("--timeout-seconds") + 1] == "10800"
         assert "--announce" not in argv and "--token" not in argv
 
     def test_one_shot_uses_at_without_a_zone(self):
@@ -345,6 +348,7 @@ class TestArgv:
         assert argv[argv.index("--cron") + 1] == daily["schedule"]
         assert argv[argv.index("--tz") + 1] == TZ
         assert argv[argv.index("--message") + 1] == daily["prompt"]
+        assert argv[argv.index("--timeout-seconds") + 1] == "10800"
         assert "--no-deliver" in argv
 
     def test_remove_is_by_id(self):
@@ -456,6 +460,18 @@ class TestMain:
         sched = FakeScheduler(registered_like_spec([]) + [row("heartbeat-main", expr="*/30 * * * *")])
         run_main(tmp_path, monkeypatch, [], sched)
         assert sched.writes == []
+
+    def test_a_disabled_legacy_job_is_brought_to_the_spec_but_stays_disabled(self, tmp_path, monkeypatch, capsys):
+        rows = registered_like_spec([], enabled=False)
+        for registered in rows:
+            registered["payload"].pop("timeoutSeconds", None)  # registered before the run budget
+        sched = FakeScheduler(rows)
+        with pytest.raises(SystemExit, match="DISABLED"):
+            run_main(tmp_path, monkeypatch, [], sched)
+        edited = [w for w in sched.writes if w[0] == "edit" and "id-pt-daily-edition" in w]
+        assert edited and edited[0][edited[0].index("--timeout-seconds") + 1] == "10800"
+        assert not any(w[0] in ("enable", "add") for w in sched.writes), "never enabled, never duplicated"
+        assert "leaves it disabled" in capsys.readouterr().out
 
     def test_disabled_job_is_left_alone_and_named(self, tmp_path, monkeypatch, capsys):
         sched = FakeScheduler(registered_like_spec([], enabled=False))
@@ -811,18 +827,29 @@ class TestScheduledHold:
         jobs = crons.desired_jobs([], "07:00", TZ)
         prompt = jobs[0]["prompt"]
         assert "--hold-until 07:00" in prompt
-        assert "--stale-minutes 240" in prompt
+        assert "--stale-minutes 200" in prompt
 
     def test_on_demand_copy_does_not_hold(self):
         p = crons.paper_prompt(lead_minutes=40)
         assert "--hold-until" not in p
-        assert "--stale-minutes 280" in p
+        assert "--stale-minutes 200" in p
 
-    def test_every_acquirer_of_the_daily_lock_outlives_the_early_start(self):
-        # A scheduled run with a 40-minute lead holds the lock 40 minutes
-        # before its own work; an on-demand copy must not call that stale.
+    def test_every_acquirer_of_the_daily_lock_uses_the_run_budget_not_the_lead(self):
+        # A run is aborted at the scheduler's budget whatever its early start, and it
+        # takes the lock no earlier than it starts: a longer lead lengthens nothing.
         jobs = crons.desired_jobs([topic("t_1", kind="section")], "07:00", TZ, 40)
-        assert "--stale-minutes 280" in jobs[0]["prompt"]
+        assert "--stale-minutes 200" in jobs[0]["prompt"]
+        assert crons.STALE_RUN_MINUTES > crons.PAPER_TIMEOUT_SECONDS / 60
+
+    def test_the_closest_accepted_pair_can_reclaim_the_first_papers_orphaned_lock(self):
+        # Two papers exactly the minimum apart: the first may use its whole budget and be
+        # killed holding the lock; the second's two wait rounds must reach the stale limit.
+        spacing = 180
+        rounds = 2 * crons.HELD_LOCK_WAIT_SECONDS / 60
+        assert crons.STALE_RUN_MINUTES <= spacing + rounds
+        crons.require_workspace_spacing(["07:00", "10:00"])  # accepted
+        with pytest.raises(SystemExit):
+            crons.require_workspace_spacing(["07:00", "09:59"])
 
     def test_paper_job_holds_until_its_hour(self):
         jobs = crons.desired_jobs(
@@ -831,7 +858,7 @@ class TestScheduledHold:
         )
         paper = next(j for j in jobs if j["name"] == "pt-paper-1200")
         assert "--hold-until 12:00" in paper["prompt"]
-        assert "--stale-minutes 240" in paper["prompt"]
+        assert "--stale-minutes 200" in paper["prompt"]
 
     def test_a_scheduled_paper_waits_out_a_fresh_holder_before_skipping(self):
         # An on-demand paper ("manda o jornal agora") holds the same workspace
@@ -900,7 +927,7 @@ class TestRunPromptsDelegateDelivery:
     def test_all_papers_share_a_lock_longer_than_the_tournament(self):
         for prompt in (crons.paper_prompt("07:00"), crons.paper_prompt(focus="12:00")):
             assert "--name paper-workspace --today" in prompt
-            assert "--stale-minutes 240" in prompt
+            assert "--stale-minutes 200" in prompt
 
     def test_scheduled_papers_reuse_only_todays_advice(self):
         for prompt in (crons.paper_prompt("07:00"), crons.paper_prompt("12:00", focus="12:00")):
@@ -1024,6 +1051,15 @@ def test_jobs_follow_the_model_boot_exports(monkeypatch):
     on_plow = {"schedule": "15 6 * * *", "tz": TZ, "prompt": "same", "model": "plow/openai/gpt-6-sol", "command": None}
     assert crons.job_drift(job, on_plow) is True
     assert crons.job_drift(job, {**on_plow, "model": "openai/gpt-6-sol"}) is False
+
+
+def test_a_job_without_a_run_budget_drifts_so_the_next_register_sets_it():
+    job = {"name": "pt-daily-edition", "schedule": "15 6 * * *", "tz": TZ, "prompt": "same"}
+    spec = {"schedule": "15 6 * * *", "tz": TZ, "prompt": "same", "model": crons.MODEL, "command": None}
+    assert crons.job_drift(job, spec) is False  # a spec that reports no timeout field says nothing
+    assert crons.job_drift(job, {**spec, "timeout": crons.PAPER_TIMEOUT_SECONDS}) is False
+    assert crons.job_drift(job, {**spec, "timeout": None}) is True  # the scheduler's 60-minute default
+    assert crons.job_drift(job, {**spec, "timeout": 3600}) is True
 
 
 def test_without_pt_model_jobs_stay_on_plow(monkeypatch):
