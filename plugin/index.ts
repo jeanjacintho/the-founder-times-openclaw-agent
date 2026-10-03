@@ -118,7 +118,11 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
   const senderId = sender.type === "member" ? senderIsOwner ? "plow-owner" : normalizedHandle(sender.provider_key) : sender.line.uid;
   const senderName = (sender.type === "member" ? sender.display_name : sender.line.display_name) ?? senderId;
   const kind = account.accountId === "email" || chat.participants.length === 2 ? "direct" : "group";
-  const peer = { kind, id: account.accountId === "email" || kind === "group" || (sender.type === "member" && !senderIsOwner) ? chat.uid : senderId } as const;
+  // Collect mode folds a thread's messages into one running session, so an outsider's mail must not share
+  // the owner's: their email runs in a session of its own (the conversation and delivery target stay the thread).
+  const outsiderMail = account.accountId === "email" && sender.type === "member" && !senderIsOwner;
+  const peer = { kind, id: outsiderMail ? `${chat.uid}-${createHash("sha256").update(senderId).digest("hex").slice(0, 12)}`
+    : account.accountId === "email" || kind === "group" || (sender.type === "member" && !senderIsOwner) ? chat.uid : senderId } as const;
   const route = runtime.channel.routing.resolveAgentRoute({ cfg, channel: "plow", accountId: account.accountId, peer });
   const media = [];
   if (account.accountId === "chat") {

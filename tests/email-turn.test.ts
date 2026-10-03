@@ -182,6 +182,20 @@ test("message from a phone turn to an email thread, even a brand-new one, is ref
   assert.deepEqual(posts, []);
 });
 
+test("mail from an outsider and mail from the owner on one thread run in different sessions", async t => {
+  const keys: Record<string, string> = {};
+  let n = 0;
+  const { contexts } = await run(t, "email", [{ chat: "thread", sender: owner }, { chat: "thread", sender: outsider }, { chat: "thread", sender: outsider }], async dispatch => {
+    keys[`turn${n++}`] = dispatch.route.sessionKey;
+  });
+  assert.equal(contexts.length, 3);
+  const [ownerKey, ...outsiderKeys] = Object.values(keys).sort((a, b) => (a.includes("-") ? 1 : 0) - (b.includes("-") ? 1 : 0));
+  assert.equal(ownerKey, "agent:main:plow:email:direct:thread");
+  assert.equal(new Set(outsiderKeys).size, 1, "one outsider keeps one session");
+  assert.notEqual(outsiderKeys[0], ownerKey);
+  assert.match(outsiderKeys[0], /^agent:main:plow:email:direct:thread-[0-9a-f]{12}$/);
+});
+
 test("a non-owner email turn has no tools and plow_send_email refuses it, even for its own thread", async t => {
   const results: { isError?: boolean; content: { text: string }[] }[] = [];
   let disabled: unknown;

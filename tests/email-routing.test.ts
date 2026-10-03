@@ -9,7 +9,7 @@ import { websocketFixture } from "./ws-fixture.ts";
 const require = createRequire(new URL("../plugin/package.json", import.meta.url));
 const { resolveAgentRoute } = await import(require.resolve("openclaw/plugin-sdk/routing"));
 
-test("native routing isolates email threads and shares one thread across senders", async t => {
+test("native routing isolates email threads, and gives each outside sender in a thread a session of their own", async t => {
   const { server, apiBase, abortAfter } = await websocketFixture(t);
   const controller = abortAfter();
   const sender = (uid: string) => ({ type: "member", uid, display_name: uid, role: "member", provider_key: [uid, "example.test"].join("@") });
@@ -49,5 +49,6 @@ test("native routing isolates email threads and shares one thread across senders
   });
   assert.equal(sessions.filter(Boolean).length, 3);
   assert.notEqual(sessions[0], sessions[1], "one sender in different threads must have separate sessions");
-  assert.equal(sessions[0], sessions[2], "different senders in one thread must share the session");
+  assert.notEqual(sessions[0], sessions[2], "an outsider's mail must not share another sender's running session");
+  assert.ok(sessions[0].startsWith(sessions[2].slice(0, sessions[2].lastIndexOf("-"))), "both stay under the same thread");
 });
