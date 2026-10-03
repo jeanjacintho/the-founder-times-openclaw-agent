@@ -44,8 +44,7 @@ SOURCE = {
     "print.retry": "; next scheduled run retries",
     "print.timeout": PRINT_TIMEOUT_NOTE,
     "print.no_pdf": "no PDF to print at {path}",
-    "turn.failed": ("I couldn't finish handling your last message. Part of the request "
-                    "may have already happened, so please check before resending."),
+    "edition.failed": "The edition was not delivered because a required run step failed.",
     "page.first_step": "FIRST STEP",
     "page.questions": "QUESTIONS FOR YOU · TEXT “Q2: …”",
     "page.sources": "Sources:",
@@ -63,8 +62,7 @@ PORTUGUESE = {
     "print.retry": "; a próxima edição agendada tenta de novo",
     "print.timeout": "resultado desconhecido: ainda em execução após {seconds}s",
     "print.no_pdf": "nenhum PDF para imprimir em {path}",
-    "turn.failed": ("Não consegui terminar de tratar sua última mensagem. Parte do pedido "
-                    "pode já ter acontecido — confira antes de mandar de novo."),
+    "edition.failed": "A edição não foi entregue porque uma etapa necessária da execução falhou.",
     "page.first_step": "PRIMEIRO PASSO",
     "page.questions": "PERGUNTAS PARA VOCÊ · RESPONDA “Q2: …”",
     "page.sources": "Fontes:",

@@ -106,7 +106,8 @@ once. The wiki is `~/Plow/wiki/projects/thefoundertimes/`.
 
 - **Chat.** The owner's phone DM is the agent's main session. Before each of
   the owner's turns the Plow channel runs the setup gate and hands the model
-  its answer; groups get answers, never setup questions.
+  its answer; groups are only listened to for priority signals and never
+  get replies or setup questions.
 - **Schedule.** Every paper is an OpenClaw scheduler job
   (`openclaw cron`), registered by `pt-dashboard/scripts/register_crons.py`
   from your topics: an isolated turn on the chat's own model, in **your**

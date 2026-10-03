@@ -646,14 +646,14 @@ class TestSoul:
             text = (ROOT / "pt-shared" / "scripts" / script).read_text()
             assert "owner_phrases import phrase" in text and "is_portuguese" not in text, script
 
-    def test_the_channels_failed_turn_notice_matches_the_scripts(self):
+    def test_the_channels_failed_edition_notice_matches_the_scripts(self):
         # The channel cannot import Python: its curated notice must be the
         # same words owner_phrases.py holds, so one language speaks one way.
         phrases = load_module("owner_phrases", "pt-shared/scripts/owner_phrases.py")
         plugin = (REPO / "plugin" / "owner-phrases.ts").read_text()
-        assert json.dumps(phrases.SOURCE["turn.failed"], ensure_ascii=False) in plugin
-        assert json.dumps(phrases.PORTUGUESE["turn.failed"], ensure_ascii=False) in plugin
-        assert "owner-phrases.json" in plugin and '"turn.failed"' in plugin
+        assert json.dumps(phrases.SOURCE["edition.failed"], ensure_ascii=False) in plugin
+        assert json.dumps(phrases.PORTUGUESE["edition.failed"], ensure_ascii=False) in plugin
+        assert "owner-phrases.json" in plugin and '"edition.failed"' in plugin
 
     def test_a_halted_tool_loop_speaks_in_the_papers_voice(self):
         # A halted loop once answered the owner with the guardrail's own text
