@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import entry from "../plugin/index.ts";
@@ -36,7 +37,8 @@ for (const kind of ["group", "direct", "email"]) for (const role of ["owner", "m
   assert.ok(context);
   assert.equal(context.sender.id, role === "owner" ? "plow-owner" : sender.provider_key);
   assert.equal(context.sender.name, sender.display_name);
-  assert.deepEqual(context.access?.toolPolicy, undefined);
+  assert.deepEqual(context.access?.toolPolicy, kind === "email" ? { deny: ["automations"] } : undefined);
+  // A group is a listening group: its tools come from the channel's group policy, not disableTools.
   assert.equal(toolsDisabled, (kind === "email" || (kind === "direct" && !trusted)) && role === "member" ? true : undefined);
   const facts = context.supplemental.channelStructuredContext[0].payload;
   assert.equal(facts.trusted, trusted);
@@ -50,7 +52,10 @@ for (const kind of ["group", "direct", "email"]) for (const role of ["owner", "m
   assert.deepEqual(context.command, command);
   assert.equal(replyMode, command && !command.authorized && trusted ? "message_tool_only" : "automatic");
   assert.equal(context.conversation.id, "chat");
-  const peer = { kind: kind === "group" ? "group" : "direct", id: kind === "direct" && role === "owner" && kind !== "email" ? "plow-owner" : "chat" };
+  // An outsider's email runs in a session of its own (thread uid + a digest of their handle).
+  const outsiderMail = kind === "email" && role === "member";
+  const peer = { kind: kind === "group" ? "group" : "direct", id: outsiderMail ? `chat-${createHash("sha256").update(sender.provider_key).digest("hex").slice(0, 12)}`
+    : kind === "direct" && role === "owner" && kind !== "email" ? "plow-owner" : "chat" };
   assert.deepEqual(routingPeer, peer);
   assert.deepEqual(context.conversation.routePeer, peer);
 });

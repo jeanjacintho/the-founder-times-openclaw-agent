@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFile } from "node:fs/promises";
+import { nativeSendPolicy } from "./native-message-policy.ts";
 import entry from "../plugin/index.ts";
+import { renderConfig } from "../boot/config.ts";
+import { probeIdentity } from "../boot/probe-fixture.ts";
 
 for (const mode of ["full", "discovery", "tool-discovery"]) test(`${mode} exposes Plow tools without a tool-call gate`, async () => {
   const names: string[] = [];
@@ -46,15 +49,21 @@ test("start-thread returns a tool error without config and makes no request", as
   assert.equal(fetch.mock.callCount(), 0);
 });
 
-test("native sends without an active conversation are rejected", async t => {
+test("native message sends enforce the host's source conversation and provider policy", () => {
+  nativeSendPolicy("cht_source", "cht_source");
+  assert.throws(() => nativeSendPolicy("cht_source", "cht_other"), /Cross-context messaging denied/);
+  assert.throws(() => nativeSendPolicy("cht_source", "cht_source", "slack"), /Cross-context messaging denied/);
+});
+
+test("native email sends are rejected before making a request", async t => {
   let channel: { outbound: { sendText: (context: object) => Promise<unknown> } };
   entry.register({ registrationMode: "full", runtime: {}, registerTool() {}, logger: { info() {} }, on() {},
     registerChannel(value: { plugin: typeof channel }) { channel = value.plugin; } });
   const fetch = t.mock.method(globalThis, "fetch", async () => { throw new Error("must not request"); });
-  for (const [accountId, refusal] of [["chat", /current conversation/], ["email", /plow_send_email/]] as const) await assert.rejects(channel!.outbound.sendText({
+  await assert.rejects(channel!.outbound.sendText({
     cfg: { channels: { plow: { apiBase: "http://fixture", lineUid: "chat", emailLineUid: "email" } } },
-    accountId, to: "target", text: "Friday at noon.",
-  }), refusal);
+    accountId: "email", to: "target", text: "Friday at noon.",
+  }), /plow_send_email/);
   assert.equal(fetch.mock.callCount(), 0);
 });
 
@@ -71,6 +80,28 @@ test("native targets preserve opaque UID case and reject names and non-chat IDs"
   for (const target of ["Joe", "+15550000001", "mem_owner", "cht_", "cht_a/b", "cht_a?b"]) {
     assert.equal(channel!.messaging.targetResolver.looksLikeId(target), false);
   }
+});
+
+test("owner-targeted delivery resolves the sentinel to the owner's phone chat", async t => {
+  let channel: { outbound: { sendText: (context: object) => Promise<unknown> } };
+  entry.register({ registrationMode: "full", runtime: {}, registerTool() {}, logger: { info() {} }, on() {},
+    registerChannel(value: { plugin: typeof channel }) { channel = value.plugin; } });
+  process.env.PLOW_AGENT_TOKEN = "test-token";
+  const chat = { uid: "cht_home", status: "active", participants: [
+    { type: "agent", relationship: "self", line: { uid: "line" } },
+    { type: "member", uid: "member", role: "owner" },
+  ] };
+  const urls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    urls.push(url);
+    if (url.endsWith("/chats")) return Response.json({ data: [chat], has_more: false });
+    if (url.endsWith("/chats/cht_home")) return Response.json(chat);
+    if (url.endsWith("/chats/cht_home/messages")) return Response.json({ uid: "delivered" });
+    return new Response(null, { status: 404 });
+  });
+  assert.deepEqual(await channel!.outbound.sendText({ cfg: { channels: { plow: { apiBase: "http://fixture", lineUid: "line" } } },
+    accountId: "chat", to: "plow-owner", text: "Reminder" }), { channel: "plow", messageId: "delivered" });
+  assert.equal(urls.at(-1), "http://fixture/v1/chats/cht_home/messages");
 });
 
 test("heartbeat owner discovery identifies only the sentinel as a direct destination", () => {
