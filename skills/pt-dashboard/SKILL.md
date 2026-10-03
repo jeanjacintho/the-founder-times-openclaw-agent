@@ -17,7 +17,7 @@ topic list:
 | `pt-subscription-<id>` | `<min> <hour> * * *` from `delivery.hour` | one per subscription topic not yet cancelled; created and removed as topics change |
 | `pt-oneoff-<id>` | one-shot at the topic's `scheduled_for` (pt-intake: `now + 3m` quick, next `delivery.hour` deep) | one per pending one-off still ahead, so a rebuild re-creates it; a past one is not re-armed. The sweep removes it once the topic is delivered, cancelled or missing |
 | `pt-deliver` | every minute | the outbox's flusher: a **no-agent command job** (`--command-argv` running `post_to_chat.py --flush-outbox` with the venv's python; no model, no tokens). Posts each staged paper once its hour has come. Every install has it; the sweep never removes it; it drifts only on its command |
-| `pt-daily-edition-now` | one-shot, a minute out | `register_crons.py --now`: the main paper on demand, same prompt as `pt-daily-edition` without `--hold-until`; the next `--now` replaces it unless it is running (then nothing is queued), the sweep never removes it |
+| `pt-daily-edition-now` | one-shot, a minute out | `register_crons.py --now`: the main paper on demand, same prompt as `pt-daily-edition` without `--hold-until`; the next `--now` replaces it unless it is running (then nothing is queued), the sweep never removes it; `--now --fresh-advice` runs the advice tournament instead of reusing a checkpoint |
 
 The daily schedule is computed in minutes, so `00:00 − 0min` is `0 0 * * *`
 (midnight itself). A lead that would reach back past midnight, such as
@@ -122,8 +122,14 @@ everything else finishes.
 From a turn (exec inherits the gateway token):
 
     node /app/openclaw.mjs cron list --all --json        # is the job there, and enabled?
-    node /app/openclaw.mjs cron run <job-id> --json      # force one
+    node /app/openclaw.mjs cron run <job-id> --json      # force one (never a paper job)
     node /app/openclaw.mjs cron runs --id <job-id> --json  # then look for the edition in chat
+
+Never force a paper job (`pt-daily-edition`, `pt-paper-*`) this way: past its
+delivery hour the window rule skips the advice tournament, so the copy prints
+no fresh advice. To re-run the main paper, queue a copy with `register_crons.py --now`,
+or `--now --fresh-advice` when the owner asked to re-evaluate priorities. `--now` always
+builds the main paper's roster, so it is not a recovery for a `pt-paper-*` job.
 
 A forced run exercises the whole path a nightly fire would take once it
 starts; its `runId` starts with `manual:`. Only a scheduled fire proves the

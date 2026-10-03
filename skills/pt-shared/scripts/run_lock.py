@@ -12,6 +12,7 @@ on.
 
   acquire --name NAME [--today] [--stale-minutes N] [--wait-seconds N]
   release --name NAME [--today]
+  name    --name NAME --today       print the resolved lock name and nothing else
 
 `--today` appends `-YYYY-MM-DD`, the owner's day on the owner's clock
 (owner_time.py), so a paper's lock is `paper-workspace-2026-09-25` without
@@ -70,15 +71,27 @@ def now():
     return datetime.now(timezone.utc).astimezone()
 
 
-def age_minutes(text):
-    """Minutes since the lock was written; None when it cannot be trusted."""
+def parse_stamp(text):
+    """The time a lock was written, or None when it cannot be trusted."""
     try:
         stamp = datetime.fromisoformat(text.strip())
     except (ValueError, AttributeError):
         return None
-    if stamp.tzinfo is None:
+    return stamp if stamp.tzinfo else None
+
+
+def taken_at(run_root, name):
+    """When the lock NAME under run_root was taken, or None."""
+    try:
+        return parse_stamp((pathlib.Path(run_root) / f"{name}.lock").read_text())
+    except OSError:
         return None
-    return (now() - stamp).total_seconds() / 60.0
+
+
+def age_minutes(text):
+    """Minutes since the lock was written; None when it cannot be trusted."""
+    stamp = parse_stamp(text)
+    return None if stamp is None else (now() - stamp).total_seconds() / 60.0
 
 
 @contextmanager
@@ -167,6 +180,11 @@ def main(argv=None):
     rel.add_argument("--name", required=True)
     rel.add_argument("--today", action="store_true", help="append the owner's date to NAME")
     rel.set_defaults(func=lambda a: release(a.name))
+
+    nam = sub.add_parser("name", help="print the lock name with today's date, to pin it")
+    nam.add_argument("--name", required=True)
+    nam.add_argument("--today", action="store_true", help="append the owner's date to NAME")
+    nam.set_defaults(func=lambda a: print(a.name) or 0)
 
     args = parser.parse_args(argv)
     if not NAME_RE.fullmatch(args.name):

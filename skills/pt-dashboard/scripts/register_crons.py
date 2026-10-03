@@ -115,7 +115,8 @@ STALE_RUN_MINUTES = 240
 # A scheduled paper that finds the workspace held (an on-demand copy runs its
 # whole ~35-minute paper under the lock) waits two rounds of this before giving
 # the day up: ~40 minutes, inside the hold-until window, each round under
-# OpenClaw's 30-minute exec timeout. The on-demand copy never waits.
+# OpenClaw's 30-minute exec timeout. The plain on-demand copy never waits; a
+# fresh-advice copy does.
 HELD_LOCK_WAIT_SECONDS = 1200
 # The priority desk's floor: with less than this left before delivery, a fresh
 # three-generation tournament cannot finish (measured ~35-50 min) before the
@@ -154,7 +155,7 @@ TOPIC_PROMPT = (
 )
 
 
-def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
+def paper_prompt(hold_until=None, lead_minutes=0, focus=None, fresh_advice=False):
     """The one run prompt every paper is built from, scheduled or on demand.
 
     focus=None is the MAIN paper: every active section with no deliver_at
@@ -169,7 +170,10 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
     on-demand copy (--now) passes none, posts when done, and never waits
     ~150 minutes on a tournament: it reuses the newest accepted checkpoint
     of any date, printed with its as-of date, and runs the tournament only
-    when none has ever been accepted.
+    when none has ever been accepted. fresh_advice (--now --fresh-advice) is
+    the owner asking to re-evaluate today's priorities: that copy runs the
+    tournament and reuses no checkpoint, since reusing one is what they
+    asked it not to do.
 
     The prompt carries only what the run cannot read from its skills: the
     lock, the roster, the advice rule and the send clock. Delivery, print
@@ -195,28 +199,60 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
     )
     lock = script("pt-shared", "run_lock.py")
     advice = (
+        "run the tournament now, whatever run/desk-priority/tournament.json holds: the owner "
+        "asked to re-evaluate today's priorities, so reuse none, and no delivery hour bounds "
+        "it. If it cannot reach an accepted checkpoint, the paper is not delivered: never "
+        "print an unavailable advice card for a tournament that ran"
+        if fresh_advice else
         "reuse today's accepted checkpoint in run/desk-priority/tournament.json when "
         f"there is one, else run the tournament -- this job starts {lead_minutes} minutes "
         f"before {hold_until} (delivery.lead_minutes, clamped so it never starts before "
         f"midnight); once the lock is yours, run {script('pt-shared', 'owner_time.py')} "
-        f"minutes-until {hold_until} and, under {MIN_TOURNAMENT_MINUTES} minutes, write the "
-        f"desk's own unavailable reason per pt-priority/SKILL.md instead of starting one"
+        f"minutes-until {hold_until} and, under {MIN_TOURNAMENT_MINUTES} minutes, record the "
+        f"desk's unavailable reason with {script('pt-priority', 'advice_unavailable.py')} window "
+        f"--deliver-at {hold_until} --reason \"<why, in the owner's language>\" instead of "
+        f"starting one; with {MIN_TOURNAMENT_MINUTES} minutes "
+        f"or more, run the tournament"
         if hold_until else
         "reuse the newest accepted checkpoint in run/desk-priority/tournament.json whatever "
         "its date -- an older one prints with \"as_of\" per pt-edition -- and run the "
         "tournament only if none has ever been accepted. An older checkpoint is never a "
         "reason to stop the paper; continue research and compile the edition with its as-of date"
     )
-    wait = f" --wait-seconds {HELD_LOCK_WAIT_SECONDS}" if hold_until else ""
-    held = (
-        "run the same acquire once more; if that is also 'held', another paper owns "
-        "the workspace -- stop"
-        if hold_until else "another paper owns the workspace -- stop"
-    )
+    # A fresh-advice copy waits like a scheduled paper: it was promised to the owner, and
+    # a paper that starts in the minute before it runs would otherwise end it at 'held'.
+    waits = bool(hold_until) or fresh_advice
+    wait = f" --wait-seconds {HELD_LOCK_WAIT_SECONDS}" if waits else ""
+    if fresh_advice:
+        # The tournament alone takes 35-50 minutes, so two rounds can end before a
+        # paper that won the workspace in the scheduling gap lets go; its lock
+        # goes stale on its own after STALE_RUN_MINUTES, which bounds this.
+        held = (
+            "run the same acquire again, and again for as long as it prints 'held' "
+            "(each round waits; the other paper's lock expires on its own) -- never stop "
+            "at 'held', the owner was promised this evaluation"
+        )
+    elif waits:
+        held = (
+            "run the same acquire once more; if that is also 'held', another paper owns "
+            "the workspace -- stop"
+        )
+    else:
+        held = "another paper owns the workspace -- stop"
+    if fresh_advice:
+        # Every retry above is a new invocation, so `--today` would re-resolve the date on each and
+        # a wait that crosses the owner's midnight would take the next day's lock while the earlier
+        # paper still owns the shared workspace: the name is resolved once and reused.
+        lock_arg = "--name LOCK"
+        pin = (f"First run {lock} name --name {WORKSPACE_LOCK} --today and keep its output as LOCK "
+               f"for this whole run, even if the date turns while you wait. Then run ")
+    else:
+        lock_arg = f"--name {WORKSPACE_LOCK} --today"
+        pin = "First run "
     return (
         f"{PAPER_RUN_MARKER} {SKILL_LOADING}"
-        f"Run {title} now, in one session. First run {lock} acquire "
-        f"--name {WORKSPACE_LOCK} --today --stale-minutes {STALE_RUN_MINUTES + lead_minutes}{wait}; "
+        f"Run {title} now, in one session. {pin}{lock} acquire "
+        f"{lock_arg} --stale-minutes {STALE_RUN_MINUTES + lead_minutes}{wait}; "
         f"if its output is 'held', "
         f"{held}. Then "
         f"/opt/plow/skills/pt-shared/scripts/prepare_daily_run.py --preserve-priority "
@@ -225,13 +261,13 @@ def paper_prompt(hold_until=None, lead_minutes=0, focus=None):
         f"(delivered sections are yesterday's paper, not a skip). Run "
         f"/opt/plow/skills/pt-intake/scripts/topics.py check-paper {check}. "
         f"If it refuses, repeat its named roster, run {lock} "
-        f"release --name {WORKSPACE_LOCK} --today, and stop before research. "
+        f"release {lock_arg}, and stop before research. "
         f"Then run pt-research: first the priority desk exactly as "
         f"pt-research/references/desks.md says ({advice}), "
         f"then every other standing desk it lists, in its order, then {roster}. "
         f"Then run pt-edition for the batch, delivering with post_to_chat.py "
         f"per pt-edition/SKILL.md step 2{hold}. "
-        f"Release the lock with {lock} release --name {WORKSPACE_LOCK} --today. "
+        f"Release the lock with {lock} release {lock_arg}. "
         f"{DELIVERY_FAILURE_NOTICE}"
     )
 
@@ -611,7 +647,13 @@ def job_drift(job, spec):
     return False
 
 
-def queue_now(backend, listing, lead_minutes, owner_tz, clock=None):
+def _is_paper(name):
+    """A job that runs a paper under the workspace lock."""
+    return (name in (DAILY_NAME, NOW_NAME) or bool(_EXTRA_DAILY_RE.fullmatch(name))
+            or bool(_PAPER_RE.fullmatch(name)))
+
+
+def queue_now(backend, listing, lead_minutes, owner_tz, clock=None, fresh_advice=False):
     """The on-demand copy: the main paper's own prompt as a one-shot job.
 
     The scheduler fires it exactly like the morning run -- its own session,
@@ -621,18 +663,25 @@ def queue_now(backend, listing, lead_minutes, owner_tz, clock=None):
     never cancels a copy the owner was already promised. A copy that is
     running is left alone and no second one is queued: `cron rm` aborts its
     session mid-paper, the workspace lock outlives it, and every later copy
-    reads 'held' and stops until the lock goes stale.
+    reads 'held' and stops until the lock goes stale. The same holds for any
+    paper mid-run: a copy queued behind it reads 'held' and stops. So while
+    one runs, a fresh-advice request queues nothing and says so -- the running
+    paper reuses its checkpoint, so its edition is not the fresh evaluation.
     """
-    running = [j for j in listing if j.name == NOW_NAME and j.running]
+    running = [j for j in listing if _is_paper(j.name) and j.running]
+    if running and fresh_advice:
+        print(f"not queued: {running[0].name} ({running[0].id}) is mid-paper -- "
+              "no fresh evaluation was queued; ask again once it is delivered")
+        return
     if running:
-        print(f"already running: {NOW_NAME} ({running[0].id}) -- its edition is on the way")
+        print(f"already running: {running[0].name} ({running[0].id}) -- its edition is on the way")
         return
     at =(clock or datetime.now(ZoneInfo(owner_tz))) + timedelta(minutes=1)
     job = {
         "name": NOW_NAME,
         "schedule": at.isoformat(timespec="seconds"),
         "tz": None,
-        "prompt": paper_prompt(lead_minutes=lead_minutes),
+        "prompt": paper_prompt(lead_minutes=lead_minutes, fresh_advice=fresh_advice),
     }
     previous = [j.id for j in listing if j.name == NOW_NAME]
     _check(backend.create(job), f"could not queue {NOW_NAME}")
@@ -655,7 +704,14 @@ def main(argv=None, backend=None, config_path=CONFIG_FILE, env=None):
         help="after registering, queue the main paper as a one-shot a minute "
              "out -- the on-demand copy, same prompt, no send clock",
     )
+    parser.add_argument(
+        "--fresh-advice", action="store_true",
+        help="with --now: the owner asked to re-evaluate today's priorities, so the "
+             "copy runs the advice tournament instead of reusing a checkpoint",
+    )
     args = parser.parse_args(argv if argv is not None else [])
+    if args.fresh_advice and not args.now:
+        parser.error("--fresh-advice is an option of --now")
     env = os.environ if env is None else env
 
     if backend is None:
@@ -715,7 +771,7 @@ def main(argv=None, backend=None, config_path=CONFIG_FILE, env=None):
         print(f"removed stale job: {name}")
 
     if args.now:
-        queue_now(backend, listing, lead_minutes, owner_tz)
+        queue_now(backend, listing, lead_minutes, owner_tz, fresh_advice=args.fresh_advice)
 
     if paused:
         raise SystemExit(

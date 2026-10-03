@@ -44,6 +44,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 sys.path.insert(
     0, str(pathlib.Path(__file__).resolve().parents[2] / "pt-shared" / "scripts")
 )
+sys.path.insert(
+    0, str(pathlib.Path(__file__).resolve().parents[2] / "pt-priority" / "scripts")
+)
+import advice_unavailable  # noqa: E402
 from owner_phrases import phrase  # noqa: E402
 from pt_paths import config_file  # noqa: E402
 DEFAULT_MASTHEAD = "THE FOUNDER TIMES"
@@ -580,6 +584,33 @@ def priority_desk_missing(edition, config):
     desks = {desk_of(s) for s in edition["sections"]}
     return (isinstance(block, dict) and block.get("configured") is True
             and "priority" not in desks and bool(desks & {"weather", "calendar"}))
+
+
+def unproven_unavailable_advice(edition, config, run_root):
+    """Why an "advice unavailable" card is not proven, or None.
+
+    Measured live 2026-09-30: the 07:00 paper had 148 minutes left, started no
+    critic, and wrote desk-priority/notes.json by hand saying the tournament
+    could not be completed. Only advice_unavailable.py writes that file, and
+    this re-checks its proof (the lock that recorded it, and that lock's window
+    or the wiki check, which must still fail) and that the section prints the
+    recorded reason, before the page prints it.
+    """
+    unavailable = [s for s in edition["sections"]
+                   if desk_of(s) == "priority" and s.get("priority") is None]
+    if not unavailable:
+        return None
+    owner = config.get("owner") if isinstance(config, dict) else None
+    tz = owner.get("timezone") if isinstance(owner, dict) else None
+    notes = _load_json_file(pathlib.Path(run_root) / "desk-priority" / "notes.json")
+    problem = advice_unavailable.proof_problem(notes or {}, run_root, edition["date"], tz or "UTC")
+    if problem:
+        return problem
+    # The page prints the section's own reason; only the proven one may reach the owner.
+    if any(s.get("could_not_source") != notes.get("could_not_source") for s in unavailable):
+        return ("the unavailable section's could_not_source is not the reason "
+                "advice_unavailable.py recorded in desk-priority/notes.json; copy it verbatim")
+    return None
 
 
 def _load_json_file(path):
@@ -1354,6 +1385,10 @@ def main(argv=None):
     if stale:
         sys.exit(f"error: stale desk notes for edition {edition['date']}: {stale}; "
                  "re-run that desk's gather instead of reusing yesterday's file")
+    unproven = unproven_unavailable_advice(
+        edition, config, pathlib.Path(args.edition).resolve().parent.parent)
+    if unproven:
+        sys.exit(f"error: the advice desk is unavailable without proof: {unproven}")
 
     name = masthead()
     chat_text = render_chat(edition, name, _owner_language(config))

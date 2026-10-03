@@ -677,6 +677,22 @@ class TestSoul:
         assert "owner_time.py minutes-until" in check and "under 50 minutes" in check
         assert "in the owner's language" in check and "on-demand run states no window" in check
         assert "too little tournament window" in skill
+        # Measured live 2026-09-30: with 148 minutes left the desk wrote its
+        # notes by hand and skipped the tournament; only the script, which
+        # checks the window, may record that skip.
+        assert "advice_unavailable.py window" in check and "the tournament runs" in check
+        assert "never by writing\n`run/desk-priority/notes.json` itself" in skill
+
+    def test_re_evaluating_priorities_queues_fresh_advice_never_cron_run(self):
+        # Measured live 2026-09-30: asked to re-evaluate today's priorities, the
+        # chat fired the daily job with `cron run` after its hour; its window rule
+        # skipped the tournament, so the new paper reprinted no fresh advice.
+        intake = (ROOT / "pt-intake" / "SKILL.md").read_text()
+        soul = AGENTS.read_text()
+        assert "register_crons.py --now --fresh-advice" in intake
+        assert "Never fire a paper job with `openclaw cron run`" in soul
+        dashboard = (ROOT / "pt-dashboard" / "SKILL.md").read_text()
+        assert "Never force a paper job" in dashboard
 
     def test_an_owner_chat_message_is_a_reopenable_item(self):
         # An owner correction texted to the agent's line had no documented

@@ -86,6 +86,11 @@ class FakeScheduler:
 
 
 class TestPaperPrompts:
+    def test_a_scheduled_paper_records_a_short_window_with_the_script(self):
+        prompt = crons.paper_prompt("09:30", 150)
+        assert "advice_unavailable.py window --deliver-at 09:30 --reason" in prompt
+        assert "or more, run the tournament" in prompt
+
     @pytest.mark.parametrize("prompt", [
         crons.paper_prompt(), crons.paper_prompt("09:30", 60), crons.paper_prompt(focus="18:00"),
         crons.TOPIC_PROMPT.format(tid="t_1", depth="quick")])
@@ -407,6 +412,62 @@ class TestMain:
         else:
             run_main(tmp_path, monkeypatch, [], sched, argv=["--now"])
             assert [w[:2] for w in sched.writes] == [["add", "--name"], ["rm", "old123"]]
+
+    # Measured live 2026-09-30: asked to "re-evaluate today's priorities",
+    # the chat fired the daily job after its hour; it skipped the tournament by
+    # its window rule, and the plain on-demand copy reuses yesterday's advice.
+    def test_fresh_advice_queues_a_copy_that_runs_the_tournament(self, tmp_path, monkeypatch, capsys):
+        sched = FakeScheduler(registered_like_spec([]))
+        assert run_main(tmp_path, monkeypatch, [], sched, argv=["--now", "--fresh-advice"]) == 0
+        (create,) = [w for w in sched.writes if crons.NOW_NAME in w]
+        prompt = create[create.index("--message") + 1]
+        assert prompt == crons.paper_prompt(fresh_advice=True)
+        assert "run the tournament now" in prompt and "reuse none" in prompt
+        assert "reuse the newest accepted checkpoint" not in prompt
+        assert "advice_unavailable.py" not in prompt and "the paper is not delivered" in prompt
+        assert "queued: pt-daily-edition-now" in capsys.readouterr().out
+
+    # A copy queued behind a running paper reads 'held' and stops, and the
+    # running one reuses its checkpoint: neither is the evaluation asked for.
+    @pytest.mark.parametrize("name", [crons.NOW_NAME, crons.DAILY_NAME])
+    def test_fresh_advice_behind_a_running_paper_queues_nothing(self, tmp_path, monkeypatch,
+                                                                capsys, name):
+        listing = registered_like_spec([])
+        if name == crons.NOW_NAME:
+            listing.append(row(name, jid="live123", at=FUTURE))
+        (running,) = [r for r in listing if r["name"] == name]
+        running["state"] = {"runningAtMs": 1790620326000}
+        sched = FakeScheduler(listing)
+        assert run_main(tmp_path, monkeypatch, [], sched, argv=["--now", "--fresh-advice"]) == 0
+        assert sched.writes == []
+        out = capsys.readouterr().out
+        assert f"not queued: {name}" in out and "no fresh evaluation was queued" in out
+        assert "queued: pt-daily-edition-now" not in out.replace("not queued:", "")
+
+    # Another paper can start in the minute before the queued copy runs; the copy
+    # the owner was promised waits for the workspace instead of stopping at 'held'.
+    def test_a_fresh_advice_copy_waits_for_the_workspace(self):
+        waits = f"--wait-seconds {crons.HELD_LOCK_WAIT_SECONDS}"
+        assert waits in crons.paper_prompt(fresh_advice=True)
+        fresh = crons.paper_prompt(fresh_advice=True)
+        # Two rounds (~40 min) can end before a paper that won the gap lets go.
+        assert "for as long as it prints 'held'" in fresh
+        assert "once more" not in fresh
+        assert waits not in crons.paper_prompt()
+
+    def test_a_fresh_advice_copy_pins_its_lock_name_across_midnight(self):
+        # Each retry is a new acquire; `--today` would re-resolve the date on every one.
+        fresh = crons.paper_prompt(fresh_advice=True)
+        assert fresh.count("--name paper-workspace --today") == 1
+        assert "run_lock.py name --name paper-workspace --today" in fresh
+        assert fresh.count("--name LOCK") == 3  # acquire, release on refusal, release
+        assert fresh.index("run_lock.py name") < fresh.index("run_lock.py acquire")
+        assert "--name LOCK" not in crons.paper_prompt()
+
+    def test_fresh_advice_is_an_on_demand_option(self, tmp_path, monkeypatch):
+        with pytest.raises(SystemExit):
+            run_main(tmp_path, monkeypatch, [], FakeScheduler(registered_like_spec([])),
+                     argv=["--fresh-advice"])
 
     def test_now_never_removes_a_copy_that_is_running(self, tmp_path, monkeypatch, capsys):
         # Measured live: `cron rm` on a running one-shot aborted its session

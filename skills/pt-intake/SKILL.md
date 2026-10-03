@@ -140,6 +140,7 @@ or can say in a line.
 | "research X, tell me later" | `one_off` | its own edition, delivered once |
 | "update me on Y every night" / "keep an eye on Z" | `subscription` | its own edition, re-run on the delivery hour |
 | "send me the paper now" / "generate a copy I can read right now" | **not a topic** | queue the daily edition now — see below |
+| "re-evaluate today's priorities" / "print another paper with fresh advice" | **not a topic** | queue it now with fresh advice — see below |
 
 **"Give me a copy of my paper" is not a subject to research.** It names no
 claim to look up; it asks you to run the paper the owner already
@@ -155,6 +156,16 @@ job, say) in one more line. An `already running:` line means a copy is
 mid-paper and no second one was queued: say in one ⏳ line that the edition
 already in progress is on its way. With neither line, say it could not be
 queued. Never research or render it in this turn.
+
+**"Re-evaluate my priorities" is the same paper with fresh advice.** When the
+owner asks for today's priorities to be analyzed again (a new advice card,
+not yesterday's reused), queue `register_crons.py --now --fresh-advice`: that
+copy runs the advice tournament instead of reusing a checkpoint, and takes
+longer than a plain copy. Only a `queued:` line means a fresh evaluation is
+coming: say so in one ⏳ line. A `not queued:` line means a paper is mid-run
+and no fresh evaluation was queued: say that in one line and ask the owner to
+ask again once that edition arrives. Never fire the daily job with `openclaw cron run` for this: after its
+delivery hour it skips the tournament by its own window rule.
 
 A subscription/section is anything with a cadence in it. A one-off/assignment
 is a single ask. When the owner genuinely cannot be read as one or the other,

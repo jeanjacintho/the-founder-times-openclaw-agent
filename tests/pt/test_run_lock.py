@@ -172,3 +172,10 @@ def test_today_uses_the_real_owner_clock(pt_home):
     from datetime import datetime, timezone
     out(["acquire", "--name", "paper-workspace", "--today"])
     assert (pt_home / "run" / f"paper-workspace-{datetime.now(timezone.utc).date().isoformat()}.lock").is_file()
+
+
+def test_name_prints_the_pinned_lock_name(pt_home):
+    code, text = out(["name", "--name", "paper-workspace", "--today"])
+    assert code == 0 and text.startswith("paper-workspace-20") and len(text) == len("paper-workspace-2026-10-02")
+    assert out(["name", "--name", "paper-workspace"]) == (0, "paper-workspace")
+    assert not (pt_home / "run").exists(), "naming a lock takes nothing"

@@ -174,8 +174,9 @@ HTML.** Hand-write `edition.json` under the run directory:
   unavailable section instead: a one-line `body` saying today's card could not be built, and
   `could_not_source` copied verbatim from `run/desk-priority/notes.json` when its `date` is
   this edition's (that desk is kept across days; an older file's reason is not today's).
-  `render_edition.py` refuses a configured paper with no priority section, and an
-  unavailable one with no reason. Never omit the slot. Mail only when
+  `render_edition.py` refuses a configured paper with no priority section, an
+  unavailable one with no reason, and an unavailable one whose `notes.json` lacks the proof
+  `advice_unavailable.py` records (pt-priority Card). Never omit the slot. Mail only when
   `pt/config.json` has
   `mail.configured: true` **and** `run/desk-mail/notes.json` exists;
   otherwise omit the mail block entirely so that slot stays empty.
@@ -220,7 +221,9 @@ Not a topic and not built in the chat turn: `pt-intake` queues the main
 paper's own prompt as a one-shot with
 `/opt/plow/skills/pt-dashboard/scripts/register_crons.py --now`, and
 this skill delivers it from that session like any other paper (no
-`--hold-until`; the advisor card per desks.md, dated with `as_of` when older).
+`--hold-until`; the advisor card per desks.md, dated with `as_of` when older). Asked to
+re-evaluate today's priorities, `pt-intake` queues `--now --fresh-advice`, whose copy runs
+the tournament instead of reusing a checkpoint.
 
 ## Render and deliver
 

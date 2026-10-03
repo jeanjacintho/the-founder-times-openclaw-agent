@@ -24,8 +24,9 @@ accepted checkpoint (dated today, at its completed third-generation gate — wha
 `render_edition.py --tournament` checks), reuse it and start below at weather. The on-demand
 copy never waits on a tournament: it reuses that checkpoint whatever its date, and pt-edition
 prints an older one with its `as_of` date; an older checkpoint is never a reason to stop the
-edition. With none to reuse (none today for a scheduled
-paper; none ever accepted for the on-demand copy), run
+edition. An on-demand copy whose prompt asks for fresh advice (`--now --fresh-advice`, the owner
+re-evaluating today's priorities) reuses no checkpoint. With none to reuse (none today for a
+scheduled paper; none ever accepted for the on-demand copy; always, for fresh advice), run
 `/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk`, then the signals step below,
 then load `pt-priority` and follow it.
 
@@ -60,8 +61,9 @@ before any later-desk work. After compaction, resume that page alongside the las
 `tournament.json` deliverable checkpoint.
 An older delivered card is generation-zero input, never proof that today's desk is complete.
 **Skipping this desk in the canonical scheduled paper is a bug, not a shortcut**:
-a desk that cannot publish writes its reason to `could_not_source`, and `render_edition.py`
-refuses a configured paper with no priority section.
+a desk that cannot publish records its reason with `advice_unavailable.py` (pt-priority Card),
+which refuses without proof, and `render_edition.py` refuses a configured paper with no priority
+section or an unavailable card without that proof.
 
 ## 1. Location, then weather — every daily run
 
