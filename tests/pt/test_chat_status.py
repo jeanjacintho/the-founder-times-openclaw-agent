@@ -60,6 +60,44 @@ class TestBusyGate:
         assert status.busy_action(stamp, now=now) == expected
 
 
+class TestOneNoticePerWait:
+    def simulate(self, stamp, calls):
+        """Run the gate the way main() does and return what was sent, in order."""
+        sent = []
+        for now in calls:
+            action = status.busy_action(stamp, now=now)
+            if action == "send-start":
+                status.record_busy_start(stamp, now=now)
+                sent.append("busy")
+            elif action == "send-still":
+                status.record_busy_still(stamp)
+                sent.append("busy-still")
+            status.record_busy_call(stamp, now=now)
+        return sent
+
+    def test_a_long_wait_costs_two_texts_not_one_pair_every_ninety_seconds(self, tmp_path):
+        # Measured 2026-10-02: 17 texts in 22 minutes, calls 30-60 s apart.
+        stamp = tmp_path / "setup-busy.json"
+        calls = [1000.0 + 45 * i for i in range(30)]
+        assert self.simulate(stamp, calls) == ["busy", "busy-still"]
+
+    def test_a_new_wait_after_a_real_pause_gets_its_own_hang_on(self, tmp_path):
+        stamp = tmp_path / "setup-busy.json"
+        calls = [1000.0, 1030.0, 1060.0, 1060.0 + status.BUSY_NEW_WAVE_SECONDS + 1]
+        assert self.simulate(stamp, calls) == ["busy", "busy-still", "busy"]
+
+
+class TestNewWave:
+    def test_the_first_call_after_an_owner_answer_gets_its_own_hang_on(self, tmp_path):
+        stamp = tmp_path / "setup-busy.json"
+        status.record_busy_start(stamp, now=1000.0)
+        status.record_busy_still(stamp)
+        status.record_busy_call(stamp, now=1060.0)
+        # The owner answers a minute later and the next step is slow again.
+        assert status.busy_action(stamp, now=1120.0) == "already"
+        assert status.busy_action(stamp, now=1120.0, new_wave=True) == "send-start"
+
+
 class TestLanguageFromConfig:
     def test_reads_owner_language(self, tmp_path):
         cfg = tmp_path / "config.json"

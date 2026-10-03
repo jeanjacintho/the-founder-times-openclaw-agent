@@ -56,7 +56,10 @@ bare:
     /opt/plow/skills/pt-shared/scripts/chat_status.py --busy
 
 It POSTs at most two ⏳ lines ("tô nessa", then "ainda nisso" if it is
-still going). `STATUS:too-early` / `STATUS:already` is success; keep
+still going). The first call after each message the owner sends is
+`chat_status.py --busy --new-wave`: their answer starts a new wait, which gets
+its own hang-on even when the last one was minutes ago; the polls inside that
+wait stay a bare `--busy`. `STATUS:too-early` / `STATUS:already` is success; keep
 working. Never type "checking the printer", "writing a file", a URL, or
 a tool name.
 
@@ -159,7 +162,7 @@ English:
 through Latch before recording `printer.configured`** — the same
 discipline ld-setup applies to the Pi bring-up; a yes/no alone is a
 configured printer that fails on every nightly run. First tool call of
-this step is `chat_status.py --busy`. After every pending poll, `--busy`
+this step is `chat_status.py --busy --new-wave`. After every pending poll, a bare `--busy`
 again. Do not type a progress line.
 
 Latch's `plow_run_command` schema requires **`argv`** and runs the array
@@ -264,8 +267,8 @@ Copy the question (CHAT_VOICE), in the owner's language:
 Stop. On their next message:
 
 - **No** → `record_setup.py <config path> priority.configured=false`
-- **An answer** → first put it in their wiki. Run `chat_status.py --busy` before the
-  first Latch call and after each write; do not type that you are writing anything.
+- **An answer** → first put it in their wiki. Run `chat_status.py --busy --new-wave` before the
+  first Latch call and a bare `--busy` after each write; do not type that you are writing anything.
   1. `/opt/plow/skills/pt-shared/scripts/wiki_setup.py --desk` — it makes
      `~/Plow/wiki` ready (creating it when the Mac has none) and prints `WIKI:…`.
   2. `plow__plow_read_file` `path=~/Plow/wiki/entities/owner/goals.md`; add
@@ -305,7 +308,7 @@ English:
 
 **3b. On their next message**, whatever they answered, **probe once
 through Latch before recording `mail.configured`**, Google first,
-Mail.app only if that fails. `--busy` before the probe and after every
+Mail.app only if that fails. `--busy --new-wave` before the probe and a bare `--busy` after every
 poll; do not type what the probe is.
 
 1. `plow_run_command` argv (exact):
@@ -388,7 +391,7 @@ English:
 - **email** needs Google reachable. If `mail.configured` is already
   `true`, 3b's probe proved it; otherwise run 3b's Google probe (same exact
   argv) and record `false` if it fails.
-- **imessage** needs one probe through Latch — `chat_status.py --busy`
+- **imessage** needs one probe through Latch — `chat_status.py --busy --new-wave`
   first — with **exactly** the argv the daily scan uses, so the Mac's
   "always allow" covers the unattended runs:
 
@@ -420,8 +423,8 @@ scheduled yet" message, not a question back to the owner.
 
 Do not write `pt/config.json` until `NEXT_QUESTION` says `close`:
 
-1. **Read location through Latch's browser** — `chat_status.py --busy`
-   first, and again after every `goto`. `plow_browser_open` scoped to
+1. **Read location through Latch's browser** — `chat_status.py --busy --new-wave`
+   first, and a bare `--busy` again after every `goto`. `plow_browser_open` scoped to
    `["ipapi.co", "ipwho.is", "ifconfig.co"]`, then steps 2–3 of
    `pt-research/references/desks.md` §1 (the provider fallback order and
    which field is the timezone), then `plow_browser_close`. If no provider
