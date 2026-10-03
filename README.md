@@ -154,6 +154,23 @@ The sign-in is a real credential for your account, kept in the state volume
 where the agent's own tools can read it. Use it on an install only you
 talk to.
 
+## Groups, email and trust
+
+Groups the agent starts from the owner's main DM are untrusted by default;
+`PLOW_THREAD_TRUST=ask|trusted|untrusted` chooses the policy, and
+`plow_set_thread_trust` changes one group later. In an untrusted text
+conversation a non-owner gets replies only, no tools; a trusted group's
+members get the room's full tools. Groups the agent only listens to keep their
+one tool, `plow_record_signal`, whatever their trust. Non-owner senders carry
+their normalized phone number or email address as the sender id, so one person
+is one sender across chats; the owner is `plow-owner`.
+
+An email turn's final text never reaches the sender: it goes privately to the
+owner (the chat the thread was started from, else their 1:1), and mail is sent
+only with `plow_send_email`. A turn on mail from anyone but the owner has no tools, so
+an email cannot make the assistant send; the owner approves in their chat and
+the send comes from their turn.
+
 ## Moving a paper from the Hermes edition
 
 The owner's wiki lives on their Mac and does not move. The paper's own

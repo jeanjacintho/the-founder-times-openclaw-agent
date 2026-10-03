@@ -55,9 +55,9 @@ test("group chats get their own binding and only the signal tool, for everyone",
 });
 
 test("mailbox and group chats cannot displace the owner's DM", () => {
-  const config = renderConfig({ ...identity, chats: [...identity.chats,
+  const config = renderConfig({ ...identity, mailbox: { uid: "ln_mail", display_name: "Elm" }, chats: [...identity.chats,
     { uid: "cht_email", status: "active", participants: [
-      { type: "agent", relationship: "self", line: { uid: "ln_mail", provider_type: "email" } },
+      { type: "agent", relationship: "self", line: { uid: "ln_mail" } },
       { type: "member", role: "owner", uid: "mem_owner" },
     ] },
     { ...identity.chats[0], uid: "cht_group", participants: [...identity.chats[0].participants,
@@ -66,6 +66,11 @@ test("mailbox and group chats cannot displace the owner's DM", () => {
   ] }, "http://api:8000");
   assert.ok(!("ownerChatUid" in config.channels.plow));
   assert.equal(config.channels.plow.emailLineUid, "ln_mail");
+});
+
+test("the mailbox comes from identity, so it is served before its first thread exists", () => {
+  assert.equal(renderConfig({ ...identity, mailbox: { uid: "ln_mail", display_name: "Elm" } }, "http://api:8000").channels.plow.emailLineUid, "ln_mail");
+  assert.ok(!("emailLineUid" in renderConfig({ ...identity, mailbox: null }, "http://api:8000").channels.plow));
 });
 
 test("boot accepts no owner chat or ambiguous owner chats without waiting", () => {
@@ -177,8 +182,10 @@ test("phone turns cannot block on ask_user or read secrets", () => {
 
 test("native messaging retains local workspace and memory file tools", () => {
   assert.deepEqual(renderConfig(identity, "http://api:8000").tools, {
+    message: { crossContext: { allowWithinProvider: false, allowAcrossProviders: false } },
     profile: "messaging", toolSearch: false, codeMode: { enabled: false }, sessions: { visibility: "tree" }, alsoAllow: [
       "read", "write", "edit", "exec", "process", "plow_start_thread", "plow_record_signal",
+      "plow_set_thread_trust", "plow_reply_to", "plow_send_email",
       "plow__plow_browser*", "plow__plow_get_output", "plow__plow_get_result", "plow__plow_read_file",
       "plow__plow_read_skill", "plow__plow_run_applescript", "plow__plow_run_command", "plow__plow_write_file",
     ], deny: ["ask_user", "secrets"],
@@ -219,6 +226,13 @@ test("the Plow plugin may register its setup-gate prompt hook", () => {
   });
 });
 
+test("boot renders the group trust mode into the owned channel config", () => {
+  for (const mode of ["ask", "trusted", "untrusted"]) {
+    assert.equal(renderConfig(identity, "http://api:8000", undefined, mode).channels.plow.threadTrust, mode);
+  }
+  assert.throws(() => renderConfig(identity, "http://api:8000", undefined, "invalid"), /PLOW_THREAD_TRUST/);
+});
+
 test("the dashboard uses the proxy's port and accepts origins checked by the proxy", () => {
   const config = renderConfig(identity, "http://api:8000");
   assert.deepEqual(config.gateway, {
@@ -243,6 +257,7 @@ test("fresh boot seeds owner defaults and external includes for Plow-owned setti
   assert.deepEqual(owner.skills, { $include: join(includes, "skills.json5") });
   assert.equal(JSON5.parse(await readFile(join(includes, "skills.json5"), "utf8")).load.extraDirs[0], "/opt/plow/skills");
   assert.deepEqual(owner.gateway, { $include: join(includes, "gateway.json5") });
+  assert.equal(JSON5.parse(await readFile(join(includes, "plow-channel.json5"), "utf8")).threadTrust, "ask");
   assert.deepEqual(owner.messages.visibleReplies, { $include: join(includes, "visible-replies.json5") });
   assert.equal(JSON5.parse(await readFile(join(includes, "visible-replies.json5"), "utf8")), "automatic");
   assert.equal(owner.bindings.length, 2);
@@ -269,6 +284,7 @@ test("restart migrates a full render and keeps owner edits outside Plow-owned pa
   assert.deepEqual(owner.plugins.entries.extra, { enabled: true });
   // The paper owns its model: an owner edit there does not survive a restart.
   assert.deepEqual(owner.agents.defaults, { $include: join(includes, "agent-defaults.json5") });
+  assert.deepEqual(owner.messages.groupChat, { visibleReplies: "message_tool" });
   assert.deepEqual(owner.agents.entries.main.identity, { $include: join(includes, "identity.json5") });
   assert.equal(owner.bindings.length, 3);
   assert.deepEqual(owner.bindings[0], { $include: join(includes, "binding.json5") });
@@ -284,6 +300,7 @@ test("restart migrates a full render and keeps owner edits outside Plow-owned pa
   assert.deepEqual(again.channels.plow, { $include: join(includes, "plow-channel.json5") });
   assert.deepEqual(again.channels.telegram, { enabled: true });
   assert.equal(again.bindings.length, 3);
+  assert.deepEqual(again.messages.groupChat, { visibleReplies: "message_tool" });
 });
 
 test("MCP Plow server include disappears without a relay while owner MCP settings remain", async t => {
