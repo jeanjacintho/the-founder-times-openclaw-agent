@@ -151,7 +151,7 @@ for (const [label, category, sender, config, expected] of [
   all.register({ channel: {
     routing: { resolveAgentRoute: () => ({ sessionKey: "agent:main:plow:group:group" }) },
     inbound: { buildContext: async () => ({}), dispatch: async (dispatch: Dispatch) => {
-      const tool = all.tool(groupContext("group", sender.role === "owner" ? "plow-owner" : "member"));
+      const tool = all.tool(groupContext("group", sender.role === "owner" ? "plow-owner" : member.provider_key));
       // Words, a name or a chat supplied by the model are refused, never recorded.
       smuggled = await tool.execute("call", { category, text: "forged", from_name: "CEO" });
       result = await tool.execute("call", { category });

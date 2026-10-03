@@ -16,6 +16,11 @@ const groupInbox = (shared.plowGroupInbox ??= new GroupInbox());
 type DeliveryState = { unknown: boolean };
 const outboundDeliveryState = new AsyncLocalStorage<DeliveryState>();
 
+function normalizedHandle(handle: string): string {
+  const compact = handle.trim().replace(/[\s().-]/g, "");
+  return /^\+\d{10,15}$/.test(compact) ? compact : handle.trim().toLowerCase();
+}
+
 async function requestWithDeliveryState<T>(account: Account, path: string, body: unknown, state?: DeliveryState): Promise<T> {
   if (state?.unknown) throw new DeliveryUnknownError();
   try { return await request<T>(account, path, body); }
@@ -51,11 +56,11 @@ async function send(account: Account, to: string, text: string, mediaUrls: strin
 
 async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, message: Message, firstContact: boolean, history: Message[], log: (text: string) => void): Promise<TurnOutcome> {
   const sender = message.sender;
-  const senderId = sender.type === "member" ? sender.uid : sender.line.uid;
-  const senderIsOwner = sender.type === "member" && chat.participants.some(p => p.type === "member" && p.uid === senderId && p.role === "owner");
-  const senderName = sender.type === "member" ? sender.display_name : sender.line.display_name;
+  const senderIsOwner = sender.type === "member" && chat.participants.some(p => p.type === "member" && p.uid === sender.uid && p.role === "owner");
+  const senderId = sender.type === "member" ? senderIsOwner ? "plow-owner" : normalizedHandle(sender.provider_key) : sender.line.uid;
+  const senderName = (sender.type === "member" ? sender.display_name : sender.line.display_name) ?? senderId;
   const kind = account.accountId === "email" || chat.participants.length === 2 ? "direct" : "group";
-  const peer = { kind, id: account.accountId === "email" || kind === "group" ? chat.uid : senderIsOwner ? "plow-owner" : senderId } as const;
+  const peer = { kind, id: account.accountId === "email" || kind === "group" || (sender.type === "member" && !senderIsOwner) ? chat.uid : senderId } as const;
   const route = runtime.channel.routing.resolveAgentRoute({ cfg, channel: "plow", accountId: account.accountId, peer });
   const media = [];
   if (account.accountId === "chat") {
@@ -74,7 +79,7 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
   }));
   const ctxPayload = await runtime.channel.inbound.buildContext({
     channel: "plow", accountId: account.accountId, messageId: message.uid, timestamp: Date.parse(message.created_at),
-    from: kind === "group" ? `plow:group:${chat.uid}` : `plow:${senderId}`, sender: { id: senderIsOwner ? "plow-owner" : senderId, name: senderName, isBot: sender.type === "agent" },
+    from: kind === "group" ? `plow:group:${chat.uid}` : `plow:${senderId}`, sender: { id: senderId, name: senderName, isBot: sender.type === "agent" },
     conversation: { kind, id: chat.uid, label: chat.display_name, routePeer: peer },
     route: { ...route, routeSessionKey: route.sessionKey }, reply: { to: `plow:${chat.uid}`, originatingTo: `plow:${chat.uid}`, replyToId: message.reply_to?.uid },
     access: { commands: { authorized: senderIsOwner } },
@@ -97,7 +102,7 @@ async function receive(account: Account, cfg: OpenClawConfig, chat: Chat, messag
     chatUid: chat.uid, messageUid: message.uid, senderId: senderIsOwner ? "plow-owner" : senderId,
     fromName: senderName || "unnamed member", text: message.body ?? "", receivedAt: message.created_at,
   });
-  log(`turn ${JSON.stringify({ chat: chat.uid, message: message.uid, first_contact: firstContact, senderId, senderName, senderIsOwner, sessionKey: route.sessionKey, listening })}`);
+  log(`turn ${JSON.stringify({ chat: chat.uid, message: message.uid, first_contact: firstContact, senderName, senderIsOwner, sessionKey: route.sessionKey, listening })}`);
   const deliveryState: DeliveryState = { unknown: false };
   let failure: unknown;
   let observedReplyDelivery = false;
