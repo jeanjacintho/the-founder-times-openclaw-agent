@@ -36,7 +36,8 @@ for (const kind of ["group", "direct", "email"]) for (const role of ["owner", "m
   assert.ok(context);
   assert.equal(context.sender.id, role === "owner" ? "plow-owner" : sender.provider_key);
   assert.equal(context.sender.name, sender.display_name);
-  assert.deepEqual(context.access?.toolPolicy, undefined);
+  assert.deepEqual(context.access?.toolPolicy, kind === "email" ? { deny: ["automations"] } : undefined);
+  // A group is a listening group: its tools come from the channel's group policy, not disableTools.
   assert.equal(toolsDisabled, (kind === "email" || (kind === "direct" && !trusted)) && role === "member" ? true : undefined);
   const facts = context.supplemental.channelStructuredContext[0].payload;
   assert.equal(facts.trusted, trusted);

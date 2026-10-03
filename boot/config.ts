@@ -76,7 +76,7 @@ export function renderConfig(identity: Identity, apiBase: string, llm: LlmRoute 
     // The channel runs the newspaper setup gate in a before_prompt_build hook; OpenClaw
     // registers conversation hooks of a non-bundled plugin only with this opt-in.
     plugins: { load: { paths: ["/opt/plow/plugin"] }, entries: { plow: { enabled: true, hooks: { allowConversationAccess: true } } } },
-    messages: { visibleReplies: "automatic" },
+    messages: { visibleReplies: "automatic", queue: { mode: "collect" } },
     channels: { plow: {
       apiBase, lineUid: identity.line.uid, threadTrust,
       // Groups are listen-only and anyone may join one, so in a group every
@@ -125,6 +125,7 @@ const ownedPaths = [
   ["tools", ["tools"]],
   ["commands", ["commands"]],
   ["visible-replies", ["messages", "visibleReplies"]],
+  ["message-queue", ["messages", "queue"]],
   ["identity", ["agents", "entries", "main", "identity"]],
   // The paper's model, bootstrap budget and advisor sub-agents, and the skills
   // it runs, ship with the image: an owner edit here would break the edition.
